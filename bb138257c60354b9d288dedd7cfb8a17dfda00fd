@@ -1,0 +1,94 @@
+src/lib/ingest-queue.ts
+  c83da723bb1896ae 586-615
+src/components/settings/settings-view.tsx
+  b3310d21a18d1f9d 28,110-112,125-126,196-198,317-319,370-372,560-567
+src/lib/source-lifecycle.ts
+  c83da723bb1896ae 255-271
+src/i18n/ru.json
+  c83da723bb1896ae 208-209,211-216,1090-1092,1111-1113
+  b3310d21a18d1f9d 919
+src/components/layout/background-layer.tsx
+  b3310d21a18d1f9d 1-27
+src/lib/project-store.ts
+  b3310d21a18d1f9d 7,408-446
+src/components/layout/activity-panel.tsx
+  e07e87c048384345 1,114-143,495-508,519-520,526,544-550,565,570-573,577-578,580-581,583-584,588,590,597,599,602,607,609,620
+  c83da723bb1896ae 23,190-206,399-405,582
+src/i18n/it.json
+  b3310d21a18d1f9d 912-921
+  c83da723bb1896ae 208-209,211-216,1090-1092,1111-1113
+src/components/settings/sections/interface-section.tsx
+  b3310d21a18d1f9d 3-7,36,57-91,196-280
+src/components/layout/app-layout.tsx
+  b3310d21a18d1f9d 107-114
+src/i18n/en.json
+  c83da723bb1896ae 211-216,1090-1092,1111-1113
+  b3310d21a18d1f9d 912-921
+src/components/project/welcome-screen.tsx
+  b3310d21a18d1f9d 34
+src/commands/fs.ts
+  c83da723bb1896ae 2,274-278
+src/components/layout/file-tree.tsx
+  c83da723bb1896ae 2,8-9,26-52,103-104,111-126
+src/components/settings/settings-types.ts
+  b3310d21a18d1f9d 77-80
+src/App.tsx
+  b3310d21a18d1f9d 12,14-15,315-323,631-632,641,658
+src/components/sources/sources-view.tsx
+  c83da723bb1896ae 3,9,13,296-312,379-387,595,730,743,843-852,895-900
+  b3310d21a18d1f9d 21,891-894
+src/stores/background-store.ts
+  b3310d21a18d1f9d 1-37
+src/i18n/zh.json
+  c83da723bb1896ae 1090-1092,1111-1113
+  b3310d21a18d1f9d 912-921
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bb138257c60354b9d288dedd7cfb8a17dfda00fd",
+  "prompts": {
+    "b3310d21a18d1f9d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "30f87ca1-3584-48d0-a47f-fefcd83cf3c6",
+        "model": "deepseek-v4-flash-vision-exp"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 320,
+      "total_deletions": 15,
+      "accepted_lines": 3878,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/c929bad83a7f171d9ed84c51e4663fb68e7d2dda127ea5ff222f83295cae0df7"
+    },
+    "c83da723bb1896ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "809b2b77-4b3d-4813-a49c-ab5d5c7f2ddb",
+        "model": "glm-5.3"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 34306,
+      "total_deletions": 20,
+      "accepted_lines": 7877,
+      "overriden_lines": 4,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/173d2be43feee79bf37c6cb5aa048904d22984e96b63d11112e39f843ca0ee09"
+    },
+    "e07e87c048384345": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "95f52a32-4842-4888-a647-458be2c2136e",
+        "model": "deepseek/deepseek-v4-flash-vision-exp"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 79,
+      "total_deletions": 29,
+      "accepted_lines": 75,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/a5522ff28c68e2717762a11157bf46154a3b754e094769003749f47e105e9377"
+    }
+  }
+}

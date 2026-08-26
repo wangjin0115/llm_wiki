@@ -1,0 +1,112 @@
+src/lib/lint.ts
+  47eb7081365243ca 4,6-8,360-380
+src/lib/lint-config.test.ts
+  47eb7081365243ca 17-18,22
+src/lib/source-lifecycle.ts
+  47eb7081365243ca 37,283,285-292,307-320
+src/i18n/it.json
+  b3310d21a18d1f9d 2-10,16-32,49,62-75,89-98,142-145,611,1176-1180,1182-1194,1281
+  47eb7081365243ca 471,484,1004-1013
+  3ea2eb1656bbe71b 389
+src/lib/rebuild-index.ts
+  47eb7081365243ca 1-10
+src/components/layout/knowledge-tree.tsx
+  b3310d21a18d1f9d 1,72-73,105,115,118,243-254
+src/App.tsx
+  b3310d21a18d1f9d 16,688
+  47eb7081365243ca 147-157
+src/components/lint/lint-view.tsx
+  47eb7081365243ca 20-21,107,146-148,174,185,555-593
+src/lib/source-watch-defaults.json
+  47eb7081365243ca 69
+src/lib/maintenance-config.ts
+  47eb7081365243ca 1-63
+src/stores/floating-store.ts
+  b3310d21a18d1f9d 1-15
+src/lib/floating.ts
+  b3310d21a18d1f9d 1-10,13,15-20,22-36,38-45,48-56,59-61,65-68,71-83
+src/stores/wiki-store.ts
+  47eb7081365243ca 282-284,429
+src/i18n/en.json
+  b3310d21a18d1f9d 2-10,16-32,49,62-75,89-98,145,611,1004-1013,1176-1180,1182-1194,1281
+  47eb7081365243ca 274-277,389,471,484
+src/components/chat/chat-message.tsx
+  3ea2eb1656bbe71b 30,184-194,1458-1461,1642-1650,1660-1673,1677-1699,1709,1761-1853
+src/i18n/ru.json
+  47eb7081365243ca 274-277,471,484,1004-1013
+  b3310d21a18d1f9d 2-10,16-32,49,62-75,89-98,145,611,994,1002-1003,1022-1027,1176-1180,1182-1194,1281
+  3ea2eb1656bbe71b 389
+src/lib/source-watch-config.ts
+  47eb7081365243ca 7-22,82,124-125
+src/components/floating/floating-overlay.tsx
+  b3310d21a18d1f9d 2,4-31,36-37,48-56,58-59,63-70,72-157
+src-tauri/capabilities/default.json
+  b3310d21a18d1f9d 10-25
+src/components/layout/icon-sidebar.tsx
+  b3310d21a18d1f9d 7,29,52,208-216
+src/i18n/zh.json
+  b3310d21a18d1f9d 2-10,16-32,49,62-75,89-98,145,611,1176-1180,1182-1194,1281
+  47eb7081365243ca 471,484,1004-1013
+  3ea2eb1656bbe71b 389
+src/components/settings/sections/maintenance-section.tsx
+  47eb7081365243ca 46-51,71,86-103,129-157
+src/components/sources/sources-view.tsx
+  47eb7081365243ca 3,21,30-32,156-159,413-453,648,653,785,790,800,809
+src/lib/scheduled-index.ts
+  47eb7081365243ca 1-53,55-73
+src/lib/source-watch-config.test.ts
+  47eb7081365243ca 71-87
+src/lib/citation-linker.test.ts
+  3ea2eb1656bbe71b 1-58
+src/lib/scheduled-lint.ts
+  47eb7081365243ca 1-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9184f96f04aad981b7bc7c2e8ab700ae3e08f7ec",
+  "prompts": {
+    "3ea2eb1656bbe71b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fa93e74-063b-41cf-a287-d787be02c8c9",
+        "model": "deepseek/deepseek-v4-flash-vision-exp"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 34125,
+      "total_deletions": 9,
+      "accepted_lines": 73,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/e818aa70178616d78acc191701ace336ec65dd9f81739fca45f9db7565b5a9a3"
+    },
+    "47eb7081365243ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a3add63-7198-4d7e-b40d-b8aeceea5283",
+        "model": "deepseek/deepseek-v4-flash-vision-exp"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 597,
+      "total_deletions": 81,
+      "accepted_lines": 5931,
+      "overriden_lines": 36,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/a70c6059ae6c35474d74aab9fb279df91f62f81a2fec1e76ccbd85297475d31e"
+    },
+    "b3310d21a18d1f9d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "30f87ca1-3584-48d0-a47f-fefcd83cf3c6",
+        "model": "deepseek-v4-flash-vision-exp"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 382,
+      "total_deletions": 49,
+      "accepted_lines": 6509,
+      "overriden_lines": 53,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/e99d7fb0958124d0d24e827a247cea3649a5b1c8a761d2f30e18ee0fc8165931"
+    }
+  }
+}

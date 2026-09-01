@@ -1,0 +1,54 @@
+src/components/layout/app-layout.tsx
+  229e188079043549 148-151
+src/components/search/search-view.tsx
+  229e188079043549 262,266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9dbcfbd5b57a364adc3e33a485f3801daaaa7348",
+  "prompts": {
+    "0582efed453106d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d454bb21-8774-4169-9254-237b16eb1a88",
+        "model": "glm-5.3"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 44,
+      "total_deletions": 8,
+      "accepted_lines": 4014,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/2c3e6363236d7277f13d87e0b4b18e93bae34520e0cbad7ee4c05248b668621f"
+    },
+    "229e188079043549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e62f182-f53c-460e-a490-b853211ba8e6",
+        "model": "glm-5.3"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 3425,
+      "total_deletions": 216,
+      "accepted_lines": 1844,
+      "overriden_lines": 13,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/336d0552c15f91c7f7fdb69957e039c59cfa587f948933390a26374187e6d921"
+    },
+    "3ea2eb1656bbe71b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fa93e74-063b-41cf-a287-d787be02c8c9",
+        "model": "deepseek/deepseek-v4-flash-vision-exp"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 27,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/63420b4c89d2a520806be50b22f54d851f8d52a5956ad1f83b9a0a9d8d2af546"
+    }
+  }
+}

@@ -1,13 +1,16 @@
 import { useState, useCallback, useMemo, useEffect } from "react"
 import { Search, FileText, ImageIcon, X, ArrowUpRight } from "lucide-react"
 import { useWikiStore } from "@/stores/wiki-store"
-import { readFile } from "@/commands/fs"
+import { listDirectory, readFile } from "@/commands/fs"
+import type { FileNode } from "@/types/wiki"
 import { searchWiki, tokenizeQuery, type SearchResult, type ImageRef } from "@/lib/search"
 import { useTranslation } from "react-i18next"
 import { normalizePath } from "@/lib/path-utils"
 import { resolveMarkdownImageSrc } from "@/lib/markdown-image-resolver"
 import { findRawSourceForImage, imageUrlToAbsolute } from "@/lib/raw-source-resolver"
 import { isImeComposing } from "@/lib/keyboard-utils"
+import { filterRawSourceTree } from "@/lib/source-filter"
+import { filterSourceTreeByQuery } from "@/components/sources/sources-view"
 
 /**
  * One image hit displayed in the Images section.
@@ -32,14 +35,62 @@ export function SearchView() {
   const setPendingScrollImageSrc = useWikiStore((s) => s.setPendingScrollImageSrc)
 
   const [query, setQuery] = useState("")
+  const [mode, setMode] = useState<"wiki" | "source">("wiki")
   const [results, setResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  // raw/sources tree for the "source" mode. Loaded lazily on first
+  // entry into that mode; content-area keys SearchView by project id,
+  // so a project switch remounts this component and re-loads.
+  const [sourceTree, setSourceTree] = useState<FileNode[]>([])
+  const [sourceTreeError, setSourceTreeError] = useState<string | null>(null)
   // Lightbox state — null when closed. Held inline rather than via
   // a global store: nothing else needs to know which image is in
   // the lightbox, and search-view-local state means the modal
   // closes naturally when the user navigates away from search.
   const [lightbox, setLightbox] = useState<ImageHit | null>(null)
+
+  useEffect(() => {
+    if (mode !== "source" || !project) return
+    if (sourceTree.length > 0 || sourceTreeError) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const tree = await listDirectory(
+          `${normalizePath(project.path)}/raw/sources`,
+          true,
+        )
+        if (!cancelled) {
+          setSourceTree(filterRawSourceTree(tree))
+          setSourceTreeError(null)
+        }
+      } catch (err) {
+        if (!cancelled) setSourceTreeError(String(err))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [mode, project, sourceTree.length, sourceTreeError])
+
+  // Same name/path filter the sources view uses, applied live as the
+  // user types — then flattened to a plain file list (a directory
+  // whose NAME matches still surfaces all its files, because every
+  // descendant path contains the directory name).
+  const sourceResults = useMemo(() => {
+    if (mode !== "source" || !query.trim()) return [] as FileNode[]
+    return flattenSourceFiles(filterSourceTreeByQuery(sourceTree, query)).sort((a, b) =>
+      a.path.localeCompare(b.path),
+    )
+  }, [mode, sourceTree, query])
+
+  function switchMode(next: "wiki" | "source") {
+    if (next === mode) return
+    setMode(next)
+    setQuery("")
+    setResults([])
+    setHasSearched(false)
+  }
 
   const doSearch = useCallback(
     async (q: string) => {
@@ -182,6 +233,22 @@ export function SearchView() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b px-4 py-3">
+        <div className="mb-2 flex items-center gap-1 rounded-md bg-muted p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => switchMode("wiki")}
+            className={`flex-1 rounded px-2 py-1 font-medium transition-colors ${mode === "wiki" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+          >
+            {t("search.modeWiki")}
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("source")}
+            className={`flex-1 rounded px-2 py-1 font-medium transition-colors ${mode === "source" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+          >
+            {t("search.modeSource")}
+          </button>
+        </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -190,9 +257,13 @@ export function SearchView() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (isImeComposing(e)) return
-              if (e.key === "Enter") doSearch(query)
+              if (e.key === "Enter" && mode === "wiki") doSearch(query)
             }}
-            placeholder={t("search.placeholderWithShortcut")}
+            placeholder={t(
+              mode === "source"
+                ? "search.sourcePlaceholder"
+                : "search.placeholderWithShortcut",
+            )}
             className="w-full rounded-md border bg-background py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -205,7 +276,40 @@ export function SearchView() {
        * doesn't push the text list off-screen, both areas scroll
        * inside themselves."
        */}
-      {searching ? (
+      {mode === "source" ? (
+        !query.trim() ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
+            <Search className="h-8 w-8 text-muted-foreground/30" />
+            <p>{t("search.typeToFilterSource")}</p>
+          </div>
+        ) : sourceTreeError ? (
+          <div className="flex-1 p-4 text-center text-sm text-muted-foreground">
+            {sourceTreeError}
+          </div>
+        ) : sourceResults.length === 0 ? (
+          <div className="flex-1 p-4 text-center text-sm text-muted-foreground">
+            {t("search.noResults")} <span className="font-medium">"{query}"</span>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="shrink-0 px-3 pt-3 pb-1 text-xs text-muted-foreground">
+              {t("search.sourceFileCount", { count: sourceResults.length })}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-2 pb-3">
+              <div className="flex flex-col gap-1">
+                {sourceResults.map((node) => (
+                  <SourceFileRow
+                    key={node.path}
+                    node={node}
+                    query={query}
+                    onClick={() => handleOpen(node.path)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      ) : searching ? (
         <div className="flex-1 p-4 text-center text-sm text-muted-foreground">
           {t("search.searching")}
         </div>
@@ -528,6 +632,44 @@ function SearchResultCard({
       <p className="text-xs text-muted-foreground line-clamp-2">
         <HighlightedText text={result.snippet} query={query} />
       </p>
+    </button>
+  )
+}
+
+function flattenSourceFiles(nodes: readonly FileNode[]): FileNode[] {
+  return nodes.flatMap((node) =>
+    node.is_dir ? flattenSourceFiles(node.children ?? []) : [node],
+  )
+}
+
+function SourceFileRow({
+  node,
+  query,
+  onClick,
+}: {
+  node: FileNode
+  query: string
+  onClick: () => void
+}) {
+  const shortPath = node.path.split("/raw/sources/").pop() ?? node.path
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-lg border p-3 text-left text-sm hover:bg-accent transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium truncate">
+            <HighlightedText text={node.name} query={query} />
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            <HighlightedText text={shortPath} query={query} />
+          </div>
+        </div>
+      </div>
     </button>
   )
 }

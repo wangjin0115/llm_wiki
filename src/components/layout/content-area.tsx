@@ -44,9 +44,19 @@ export function ContentArea() {
     if (activeView === "lint") setHasMountedLint(true)
   }, [activeView])
 
+  // Same for the wiki preview: switching to chat or another view and back
+  // must return to the open page, not remount WikiEditor (losing edit mode,
+  // selection panels, and scroll position over a full markdown re-render).
+  const [hasMountedWiki, setHasMountedWiki] = useState(activeView === "wiki")
+
+  useEffect(() => {
+    if (activeView === "wiki") setHasMountedWiki(true)
+  }, [activeView])
+
   const keepSources = hasMountedSources || activeView === "sources"
   const keepSearch = hasMountedSearch || activeView === "search"
   const keepLint = hasMountedLint || activeView === "lint"
+  const keepWiki = hasMountedWiki || activeView === "wiki"
 
   // Key the persistent views by project so switching projects remounts them
   // with cleared state instead of surfacing the previous project's results.
@@ -69,9 +79,15 @@ export function ContentArea() {
           <LintView key={project?.id} />
         </div>
       )}
-      {activeView !== "sources" && activeView !== "search" && activeView !== "lint" && (
-        <ActiveContent activeView={activeView} />
+      {keepWiki && (
+        <div className={activeView === "wiki" ? "h-full" : "hidden"}>
+          <PreviewPanel />
+        </div>
       )}
+      {activeView !== "sources" &&
+        activeView !== "search" &&
+        activeView !== "lint" &&
+        activeView !== "wiki" && <ActiveContent activeView={activeView} />}
     </>
   )
 }
@@ -85,7 +101,7 @@ function ActiveContent({
     case "chat":
       return <ChatPanel />
     case "wiki":
-      return <PreviewPanel />
+      return null
     case "settings":
       return <SettingsView />
     case "skills":
@@ -103,7 +119,7 @@ function ActiveContent({
     case "history":
       return <HistoryView />
     default:
-      return <PreviewPanel />
+      return null
   }
 }
 

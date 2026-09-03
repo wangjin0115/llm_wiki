@@ -2,11 +2,11 @@ import { useRef, useEffect, useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { convertFileSrc, invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
-import { BookOpen, Plus, Trash2, MessageSquare, X, Maximize2, FolderOpen, FileText, ListTree, ChevronDown, ChevronRight } from "lucide-react"
+import { BookOpen, Plus, Trash2, MessageSquare, X, Maximize2, FolderOpen, FileText, ListTree, ChevronDown, ChevronRight, Pencil, Star, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ChatMessage, StreamingMessage, useSourceFiles, type ChatReferencePreview } from "./chat-message"
 import { ChatInput, type ChatSendOptions } from "./chat-input"
-import { useChatStore, chatMessagesToLLM, type MessageImage, type MessageReference } from "@/stores/chat-store"
+import { useChatStore, chatMessagesToLLM, type MessageImage, type MessageReference, type Conversation } from "@/stores/chat-store"
 import { useWikiStore } from "@/stores/wiki-store"
 import { resolveTaskLlmConfig } from "@/lib/llm-task-routing"
 import { isReasoningOnlyResponseError, streamChat } from "@/lib/llm-client"
@@ -166,9 +166,11 @@ function formatDate(timestamp: number): string {
 function ConversationSidebar({
   onNewConversation,
   onSelectConversation,
+  onExitConversation,
 }: {
   onNewConversation?: () => void
   onSelectConversation?: (id: string) => void
+  onExitConversation?: () => void
 }) {
   const { t } = useTranslation()
   const conversations = useChatStore((s) => s.conversations)
@@ -176,14 +178,159 @@ function ConversationSidebar({
   const messages = useChatStore((s) => s.messages)
   const createConversation = useChatStore((s) => s.createConversation)
   const deleteConversation = useChatStore((s) => s.deleteConversation)
+  const renameConversation = useChatStore((s) => s.renameConversation)
+  const toggleFavorite = useChatStore((s) => s.toggleFavorite)
   const setActiveConversation = useChatStore((s) => s.setActiveConversation)
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState("")
 
-  const sorted = [...conversations].sort((a, b) => b.updatedAt - a.updatedAt)
+  // Favorites first, then recency within each group.
+  const sorted = [...conversations].sort((a, b) => {
+    const aFav = a.favorited ? 1 : 0
+    const bFav = b.favorited ? 1 : 0
+    if (aFav !== bFav) return bFav - aFav
+    return b.updatedAt - a.updatedAt
+  })
+  const favoriteConversations = sorted.filter((c) => c.favorited)
+  const otherConversations = sorted.filter((c) => !c.favorited)
 
   function getMessageCount(convId: string): number {
     return messages.filter((m) => m.conversationId === convId).length
+  }
+
+  function selectConversation(id: string) {
+    if (onSelectConversation) {
+      onSelectConversation(id)
+    } else {
+      setActiveConversation(id)
+    }
+  }
+
+  function startRename(conv: Conversation) {
+    setEditingId(conv.id)
+    setEditingTitle(conv.title)
+  }
+
+  function commitRename(id: string) {
+    const title = editingTitle.trim()
+    if (title && editingId === id) {
+      renameConversation(id, title)
+    }
+    setEditingId(null)
+    setEditingTitle("")
+  }
+
+  function cancelRename() {
+    setEditingId(null)
+    setEditingTitle("")
+  }
+
+  function deleteConversationItem(conv: Conversation) {
+    deleteConversation(conv.id)
+    // Delete persisted chat file
+    const proj = useWikiStore.getState().project
+    if (proj) {
+      deleteFile(`${proj.path}/.llm-wiki/chats/${conv.id}.json`).catch(() => {})
+    }
+  }
+
+  function renderConversationItem(conv: Conversation) {
+    const isActive = conv.id === activeConversationId
+    const isEditing = editingId === conv.id
+    const msgCount = getMessageCount(conv.id)
+    const isFavorited = conv.favorited === true
+    return (
+      <div
+        key={conv.id}
+        className={`group relative mx-1 my-0.5 flex cursor-pointer flex-col rounded-md px-2 py-1.5 text-sm transition-colors ${
+          isActive
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-accent text-foreground"
+        }`}
+        onClick={() => {
+          if (isEditing) return
+          selectConversation(conv.id)
+        }}
+        onMouseEnter={() => setHoveredId(conv.id)}
+        onMouseLeave={() => setHoveredId(null)}
+      >
+        {isEditing ? (
+          <input
+            autoFocus
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === "Enter") commitRename(conv.id)
+              else if (e.key === "Escape") cancelRename()
+            }}
+            onBlur={() => commitRename(conv.id)}
+            className="w-full rounded border border-primary/50 bg-background px-1.5 py-0.5 text-xs outline-none"
+          />
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-1">
+              <span className="line-clamp-2 flex-1 text-xs font-medium leading-snug">
+                {conv.title}
+              </span>
+              <span className="flex flex-shrink-0 items-center gap-0.5">
+                <button
+                  className="rounded p-0.5 text-muted-foreground"
+                  title={isFavorited ? t("chat.unfavorite") : t("chat.favorite")}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleFavorite(conv.id)
+                  }}
+                >
+                  <Star
+                    className={`h-3 w-3 ${
+                      isFavorited
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-muted-foreground/60 hover:text-amber-400"
+                    }`}
+                  />
+                </button>
+                {hoveredId === conv.id && (
+                  <>
+                    <button
+                      className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      title={t("chat.renameConversation")}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startRename(conv)
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                      title={t("chat.deleteConversation")}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteConversationItem(conv)
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span>{formatDate(conv.updatedAt)}</span>
+              {msgCount > 0 && (
+                <>
+                  <span>·</span>
+                  <span>{msgCount} {t("chat.msgCount")}</span>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -204,6 +351,24 @@ function ConversationSidebar({
           <Plus className="h-3.5 w-3.5" />
           {t("chat.newChat")}
         </Button>
+        {activeConversationId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1 w-full gap-2 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              if (onExitConversation) {
+                onExitConversation()
+              } else {
+                setActiveConversation(null)
+              }
+            }}
+            title={t("chat.exitConversation")}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            {t("chat.exitConversation")}
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
@@ -212,60 +377,26 @@ function ConversationSidebar({
             {t("chat.noConversationsYet")}
           </p>
         ) : (
-          sorted.map((conv) => {
-            const isActive = conv.id === activeConversationId
-            const msgCount = getMessageCount(conv.id)
-            return (
-              <div
-                key={conv.id}
-                className={`group relative mx-1 my-0.5 flex cursor-pointer flex-col rounded-md px-2 py-1.5 text-sm transition-colors ${
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "hover:bg-accent text-foreground"
-                }`}
-                onClick={() => {
-                  if (onSelectConversation) {
-                    onSelectConversation(conv.id)
-                  } else {
-                    setActiveConversation(conv.id)
-                  }
-                }}
-                onMouseEnter={() => setHoveredId(conv.id)}
-                onMouseLeave={() => setHoveredId(null)}
-              >
-                <div className="flex items-start justify-between gap-1">
-                  <span className="line-clamp-2 flex-1 text-xs font-medium leading-snug">
-                    {conv.title}
-                  </span>
-                  {hoveredId === conv.id && (
-                    <button
-                      className="flex-shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteConversation(conv.id)
-                        // Delete persisted chat file
-                        const proj = useWikiStore.getState().project
-                        if (proj) {
-                          deleteFile(`${proj.path}/.llm-wiki/chats/${conv.id}.json`).catch(() => {})
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  )}
+          <>
+            {favoriteConversations.length > 0 && (
+              <>
+                <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {t("chat.favoriteSection")}
                 </div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <span>{formatDate(conv.updatedAt)}</span>
-                  {msgCount > 0 && (
-                    <>
-                      <span>·</span>
-                      <span>{msgCount} {t("chat.msgCount")}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          })
+                {favoriteConversations.map(renderConversationItem)}
+              </>
+            )}
+            {otherConversations.length > 0 && (
+              <>
+                {favoriteConversations.length > 0 && (
+                  <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {t("chat.otherSection")}
+                  </div>
+                )}
+                {otherConversations.map(renderConversationItem)}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -593,7 +724,7 @@ export function ChatPanel() {
     activeConversationId ?? "",
     activeMessages.length,
     lastMessage?.id ?? "",
-    lastMessage?.content.length ?? 0,
+    lastMessage?.content?.length ?? 0,
     activeStreaming ? streamingContent.length : 0,
   ].join(":")
 
@@ -1280,6 +1411,16 @@ export function ChatPanel() {
     setApprovingShellMessageId(null)
   }, [])
 
+  const handleExitConversation = useCallback(() => {
+    handleStop()
+    setReferencePreview(null)
+    setGeneratedOutputPreviews([])
+    setGeneratedOutputPreview(null)
+    setApprovingShellMessageId(null)
+    dismissedGeneratedOutputsKeyRef.current = null
+    useChatStore.getState().setActiveConversation(null)
+  }, [handleStop])
+
   const handleRegenerate = useCallback(async () => {
     if (activeStreaming) return
     // Find the last user message in active conversation
@@ -1413,6 +1554,7 @@ export function ChatPanel() {
       <ConversationSidebar
         onNewConversation={handleNewConversation}
         onSelectConversation={handleSelectConversation}
+        onExitConversation={handleExitConversation}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">

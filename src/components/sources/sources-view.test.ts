@@ -29,6 +29,15 @@ describe("filterSourceTreeByQuery", () => {
     expect(filterSourceTreeByQuery(TREE, "BOOKS")).toEqual([TREE[0]])
   })
 
+  it("matches a full Windows-style path with backslashes", () => {
+    // list_directory returns forward-slash paths, but a user pasting a
+    // Windows path types backslashes. The filter folds \ to / so both match.
+    const result = filterSourceTreeByQuery(TREE, "\\project\\raw\\sources\\Books\\BookA.md")
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe("Books")
+    expect(result[0].children?.map((node) => node.name)).toEqual(["BookA.md"])
+  })
+
   it("returns a new top-level array for an empty query without mutating nodes", () => {
     const result = filterSourceTreeByQuery(TREE, "  ")
     expect(result).toEqual(TREE)

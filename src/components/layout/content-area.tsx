@@ -53,10 +53,21 @@ export function ContentArea() {
     if (activeView === "wiki") setHasMountedWiki(true)
   }, [activeView])
 
+  // Keep ReviewView mounted so a running re-analysis sweep continues in the
+  // background when the user switches to another view — the sweep itself is
+  // store-backed so it survives, but unmounting would reset the "analyzing"
+  // button state, making it look like the analysis was cancelled.
+  const [hasMountedReview, setHasMountedReview] = useState(activeView === "review")
+
+  useEffect(() => {
+    if (activeView === "review") setHasMountedReview(true)
+  }, [activeView])
+
   const keepSources = hasMountedSources || activeView === "sources"
   const keepSearch = hasMountedSearch || activeView === "search"
   const keepLint = hasMountedLint || activeView === "lint"
   const keepWiki = hasMountedWiki || activeView === "wiki"
+  const keepReview = hasMountedReview || activeView === "review"
 
   // Key the persistent views by project so switching projects remounts them
   // with cleared state instead of surfacing the previous project's results.
@@ -84,10 +95,16 @@ export function ContentArea() {
           <PreviewPanel />
         </div>
       )}
+      {keepReview && (
+        <div className={activeView === "review" ? "h-full" : "hidden"}>
+          <ReviewView key={project?.id} />
+        </div>
+      )}
       {activeView !== "sources" &&
         activeView !== "search" &&
         activeView !== "lint" &&
-        activeView !== "wiki" && <ActiveContent activeView={activeView} />}
+        activeView !== "wiki" &&
+        activeView !== "review" && <ActiveContent activeView={activeView} />}
     </>
   )
 }
@@ -109,7 +126,7 @@ function ActiveContent({
     case "sources":
       return null
     case "review":
-      return <ReviewView />
+      return null
     case "lint":
       return null
     case "search":

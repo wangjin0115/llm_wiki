@@ -35,7 +35,7 @@ export function SearchView() {
   const setPendingScrollImageSrc = useWikiStore((s) => s.setPendingScrollImageSrc)
 
   const [query, setQuery] = useState("")
-  const [mode, setMode] = useState<"wiki" | "source">("wiki")
+  const [mode, setMode] = useState<"wiki" | "source" | "path">("wiki")
   const [results, setResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -44,6 +44,13 @@ export function SearchView() {
   // so a project switch remounts this component and re-loads.
   const [sourceTree, setSourceTree] = useState<FileNode[]>([])
   const [sourceTreeError, setSourceTreeError] = useState<string | null>(null)
+  // Whole-repo tree for the "path" mode. Loaded lazily on first entry
+  // into that mode with a full recursive listing (dot-dirs like `.git`
+  // and `.llm-wiki` are excluded server-side by default). Cached in
+  // local state — SearchView stays mounted across view switches, so the
+  // tree survives until a project switch remounts the component.
+  const [pathTree, setPathTree] = useState<FileNode[]>([])
+  const [pathTreeError, setPathTreeError] = useState<string | null>(null)
   // Lightbox state — null when closed. Held inline rather than via
   // a global store: nothing else needs to know which image is in
   // the lightbox, and search-view-local state means the modal
@@ -73,6 +80,30 @@ export function SearchView() {
     }
   }, [mode, project, sourceTree.length, sourceTreeError])
 
+  // Whole-repo tree for the "path" mode. Loaded lazily on first entry
+  // into that mode; content-area keys SearchView by project id, so a
+  // project switch remounts this component and re-loads. Like the
+  // source tree, it's fetched once and kept in local state.
+  useEffect(() => {
+    if (mode !== "path" || !project) return
+    if (pathTree.length > 0 || pathTreeError) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const tree = await listDirectory(normalizePath(project.path))
+        if (!cancelled) {
+          setPathTree(tree)
+          setPathTreeError(null)
+        }
+      } catch (err) {
+        if (!cancelled) setPathTreeError(String(err))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [mode, project, pathTree.length, pathTreeError])
+
   // Same name/path filter the sources view uses, applied live as the
   // user types — then flattened to a plain file list (a directory
   // whose NAME matches still surfaces all its files, because every
@@ -84,7 +115,16 @@ export function SearchView() {
     )
   }, [mode, sourceTree, query])
 
-  function switchMode(next: "wiki" | "source") {
+  // Whole-repo name/path filter for the "path" mode, same shape as
+  // `sourceResults` above but over the full project tree.
+  const pathResults = useMemo(() => {
+    if (mode !== "path" || !query.trim()) return [] as FileNode[]
+    return flattenSourceFiles(filterSourceTreeByQuery(pathTree, query)).sort((a, b) =>
+      a.path.localeCompare(b.path),
+    )
+  }, [mode, pathTree, query])
+
+  function switchMode(next: "wiki" | "source" | "path") {
     if (next === mode) return
     setMode(next)
     setQuery("")
@@ -230,10 +270,29 @@ export function SearchView() {
     }
   }
 
+  // "source" and "path" modes share one file-list render: both lazily
+  // load a tree and live-filter it as the user types. The only
+  // difference is which tree feeds it and how the row short-path is
+  // computed (raw/sources-relative vs. project-root-relative).
+  const isFileMode = mode === "source" || mode === "path"
+  const fileTreeError = mode === "source" ? sourceTreeError : pathTreeError
+  const fileResults = mode === "source" ? sourceResults : pathResults
+  const fileTypeHint = t(
+    mode === "source" ? "search.typeToFilterSource" : "search.typeToFilterPath",
+  )
+  const projectRootForPath = project ? `${normalizePath(project.path)}/` : undefined
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b px-4 py-3">
         <div className="mb-2 flex items-center gap-1 rounded-md bg-muted p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => switchMode("path")}
+            className={`flex-1 rounded px-2 py-1 font-medium transition-colors ${mode === "path" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+          >
+            {t("search.modePath")}
+          </button>
           <button
             type="button"
             onClick={() => switchMode("wiki")}
@@ -260,9 +319,11 @@ export function SearchView() {
               if (e.key === "Enter" && mode === "wiki") doSearch(query)
             }}
             placeholder={t(
-              mode === "source"
-                ? "search.sourcePlaceholder"
-                : "search.placeholderWithShortcut",
+              mode === "path"
+                ? "search.pathPlaceholder"
+                : mode === "source"
+                  ? "search.sourcePlaceholder"
+                  : "search.placeholderWithShortcut",
             )}
             className="w-full rounded-md border bg-background py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
@@ -276,33 +337,34 @@ export function SearchView() {
        * doesn't push the text list off-screen, both areas scroll
        * inside themselves."
        */}
-      {mode === "source" ? (
+      {isFileMode ? (
         !query.trim() ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
             <Search className="h-8 w-8 text-muted-foreground/30" />
-            <p>{t("search.typeToFilterSource")}</p>
+            <p>{fileTypeHint}</p>
           </div>
-        ) : sourceTreeError ? (
+        ) : fileTreeError ? (
           <div className="flex-1 p-4 text-center text-sm text-muted-foreground">
-            {sourceTreeError}
+            {fileTreeError}
           </div>
-        ) : sourceResults.length === 0 ? (
+        ) : fileResults.length === 0 ? (
           <div className="flex-1 p-4 text-center text-sm text-muted-foreground">
             {t("search.noResults")} <span className="font-medium">"{query}"</span>
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="shrink-0 px-3 pt-3 pb-1 text-xs text-muted-foreground">
-              {t("search.sourceFileCount", { count: sourceResults.length })}
+              {t("search.sourceFileCount", { count: fileResults.length })}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-2 pb-3">
               <div className="flex flex-col gap-1">
-                {sourceResults.map((node) => (
+                {fileResults.map((node) => (
                   <SourceFileRow
                     key={node.path}
                     node={node}
                     query={query}
                     onClick={() => handleOpen(node.path)}
+                    shortPathBase={mode === "source" ? "/raw/sources/" : projectRootForPath}
                   />
                 ))}
               </div>
@@ -646,12 +708,19 @@ function SourceFileRow({
   node,
   query,
   onClick,
+  shortPathBase = "/raw/sources/",
 }: {
   node: FileNode
   query: string
   onClick: () => void
+  // Prefix stripped from `node.path` for display. Source rows show the
+  // path relative to raw/sources; path-mode rows show it relative to
+  // the project root.
+  shortPathBase?: string
 }) {
-  const shortPath = node.path.split("/raw/sources/").pop() ?? node.path
+  const shortPath = shortPathBase
+    ? node.path.split(shortPathBase).pop() ?? node.path
+    : node.path
 
   return (
     <button

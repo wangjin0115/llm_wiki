@@ -78,7 +78,7 @@ function App() {
     }
   }
 
-  async function hydrateProjectSideStores(proj: WikiProject): Promise<void> {
+  async function hydrateProjectReviewStore(proj: WikiProject): Promise<void> {
     try {
       const savedReview = await loadReviewItems(proj.path)
       if (savedReview.length > 0 && isCurrentProject(proj)) {
@@ -87,7 +87,9 @@ function App() {
     } catch (err) {
       console.warn("[startup] failed to load review items:", err)
     }
+  }
 
+  async function hydrateProjectLintStore(proj: WikiProject): Promise<void> {
     try {
       const savedLint = await loadLintItems(proj.path)
       if (savedLint.length > 0 && isCurrentProject(proj)) {
@@ -580,6 +582,11 @@ function App() {
       // empty store created by resetProjectState() can be persisted over
       // conversations.json before the deferred loader restores old chats.
       await hydrateProjectChatStore(proj)
+      // Review/lint must also be hydrated before auto-save resumes. Otherwise a
+      // fast project switch can flush the still-empty store over the outgoing
+      // project's .llm-wiki/review.json — wiping its pending review items.
+      await hydrateProjectReviewStore(proj)
+      await hydrateProjectLintStore(proj)
     }, () => {
       // If project loading fails after resetProjectState() and before persisted
       // review/lint/chat state has been restored, do not leave auto-save armed
@@ -591,10 +598,6 @@ function App() {
     void hydrateScheduledImportAfterOpen(proj)
     void hydrateScheduledLintAfterOpen(proj)
     void hydrateScheduledIndexAfterOpen(proj)
-    // Heavy side-store hydration happens after the project shell is allowed
-    // to render. Each write has a stale-project guard so a fast project switch
-    // cannot apply old review/lint/chat state to the new project.
-    void hydrateProjectSideStores(proj)
   }
 
   async function handleSelectRecent(proj: WikiProject) {

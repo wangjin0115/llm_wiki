@@ -737,7 +737,14 @@ export function filterSourceTreeByQuery(
   nodes: readonly FileNode[],
   query: string,
 ): FileNode[] {
-  const needle = query.trim().normalize("NFKC").toLocaleLowerCase()
+  // Fold the query to the same form the tree uses. node.path is normalized to
+  // forward slashes, but a user pasting a Windows path types backslashes
+  // ("D:\repo\...") — without folding those, the substring match always fails.
+  const needle = query
+    .trim()
+    .normalize("NFKC")
+    .replace(/\\/g, "/")
+    .toLocaleLowerCase()
   if (!needle) return [...nodes]
 
   const visit = (node: FileNode): FileNode | null => {

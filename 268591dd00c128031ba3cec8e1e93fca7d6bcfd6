@@ -1,0 +1,82 @@
+src/stores/chat-store.ts
+  f8aeaeb2b29a8a05 23,74,183-189
+src/i18n/ru.json
+  f8aeaeb2b29a8a05 352-357,551-553,566-584
+  aca99ee6aba880b5 121-122,124-127,453,548-550,564-565
+src/lib/review-path-parser.ts
+  f8aeaeb2b29a8a05 1-21
+src/components/layout/content-area.tsx
+  f8aeaeb2b29a8a05 56-65,70,98-102,106-107,129
+src/components/search/search-view.tsx
+  f8aeaeb2b29a8a05 38,47-53,83-106,118-127,289-295,322-326
+src/components/chat/chat-panel.tsx
+  aca99ee6aba880b5 5,169,173,188,354-371,727,1557
+  f8aeaeb2b29a8a05 9,181-182,186-187,189-197,203-335,380-384,386-399
+src/i18n/zh.json
+  f8aeaeb2b29a8a05 352-357,548-554,564-584
+  aca99ee6aba880b5 121-127,348
+src/stores/chat-store.test.ts
+  f8aeaeb2b29a8a05 169-205
+src/lib/sweep-reviews.ts
+  f8aeaeb2b29a8a05 53-56,64,68,296-297,303,309,316-319,366-390,394,403,438-440,445-447,450,461,473-476
+src/components/sources/sources-view.tsx
+  f8aeaeb2b29a8a05 740-747
+src/components/review/review-edit-panel.tsx
+  f8aeaeb2b29a8a05 1-298
+src/components/layout/sidebar-panel.tsx
+  f8aeaeb2b29a8a05 51-63
+src/components/editor/wiki-editor.tsx
+  aca99ee6aba880b5 8,55-58,75-81,83,112,117,120-121,133-134,139,143,167,169,176,189-190,195-204,212-225,227,235,237-241,243,251,267-271,279,284,292-296,313-314,379-407,409-424,426,430-444,506,540-541,545-567,573-583,591,605-607,619,632,647-657,679-689,691-699
+  f8aeaeb2b29a8a05 141,147-153,158,161-164
+src/i18n/en.json
+  f8aeaeb2b29a8a05 548-554,564-584
+  aca99ee6aba880b5 121-127,301,352-357
+src/components/sources/sources-view.test.ts
+  f8aeaeb2b29a8a05 32-40
+src/lib/sweep-reviews.race.test.ts
+  f8aeaeb2b29a8a05 21,100,198-246
+src/lib/review-path-parser.test.ts
+  f8aeaeb2b29a8a05 1-43
+src/App.tsx
+  f8aeaeb2b29a8a05 81,90,92,585-589
+src/components/review/review-view.tsx
+  f8aeaeb2b29a8a05 1,14-17,32,34-35,54,58,60-65,104-136,449-466,533-544,562,581-583,593-595,688-699,701,706-713,720-764
+src/i18n/it.json
+  f8aeaeb2b29a8a05 548-554,564-584
+  aca99ee6aba880b5 121-122,124-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "268591dd00c128031ba3cec8e1e93fca7d6bcfd6",
+  "prompts": {
+    "aca99ee6aba880b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c197974-32ae-49c0-a35e-077a07c2fdbf",
+        "model": "<synthetic>"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 413,
+      "total_deletions": 183,
+      "accepted_lines": 9735,
+      "overriden_lines": 56,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/4e625d8c2c87dda2dc240673e0684301b702966a64387784ee8a2d8ede4f6fd2"
+    },
+    "f8aeaeb2b29a8a05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "349856ac-1738-4292-8436-6170baf02604",
+        "model": "glm-4.7"
+      },
+      "human_author": "王锦 <wangjin0115@cviauto.com>",
+      "messages": [],
+      "total_additions": 1098,
+      "total_deletions": 155,
+      "accepted_lines": 5836,
+      "overriden_lines": 20,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/9b519bc8b1c9701c8d12ebc86011e093d85d379412f916043cbb043c98221ef2"
+    }
+  }
+}

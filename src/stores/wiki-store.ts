@@ -279,6 +279,9 @@ interface SourceWatchConfig {
   excludeExtensions: string[]
   excludeDirs: string[]
   excludeGlobs: string[]
+  /** Exact file/folder paths (source-relative, e.g. "foo.md" / "docs/foo.pdf")
+   *  excluded from ingest via the Sources view. */
+  excludedPaths: string[]
   maxFileSizeMb: number
 }
 
@@ -388,6 +391,16 @@ export interface ExternalPreview {
   snippet: string
 }
 
+const RECENT_PREVIEW_PATHS_LIMIT = 10
+
+/** 记录最近打开的预览路径（新→旧，去重，上限 10）。内存伪路径（anytxt://
+ *  等）不落盘、重读不到，跳过不记。 */
+function pushRecentPreviewPath(paths: string[], path: string): string[] {
+  if (path.includes("://")) return paths
+  const next = [path, ...paths.filter((p) => p !== path)]
+  return next.length > RECENT_PREVIEW_PATHS_LIMIT ? next.slice(0, RECENT_PREVIEW_PATHS_LIMIT) : next
+}
+
 interface WikiState {
   project: WikiProject | null
   fileTree: FileNode[]
@@ -402,6 +415,12 @@ interface WikiState {
   fileContent: string
   previewContentPath: string | null
   externalPreview: ExternalPreview | null
+  /**
+   * 最近打开过的预览文件路径（预览区标签条数据源，新→旧）。仅记录真实
+   * 磁盘路径；anytxt://、external-preview:// 等内存伪路径不落盘、无法重读，
+   * 不进列表。会话内有效，不持久化。
+   */
+  recentPreviewPaths: string[]
   /**
    * View that handed control to the full-width wiki preview. Closing the
    * preview must return there instead of leaving an empty wiki surface.
@@ -423,7 +442,7 @@ interface WikiState {
    * one wiki-relative) still works.
    */
   pendingScrollImageSrc: string | null
-  activeView: "chat" | "wiki" | "sources" | "search" | "graph" | "lint" | "review" | "skills" | "settings"
+  activeView: "chat" | "wiki" | "sources" | "search" | "graph" | "lint" | "review" | "skills" | "settings" | "history"
   llmConfig: LlmConfig
   /** Persisted global/default config, kept separate while a project override is effective. */
   globalLlmConfig: LlmConfig
@@ -455,6 +474,9 @@ interface WikiState {
   openPathInPreview: (path: string) => void
   openFileInPreview: (path: string, content: string) => void
   closePreview: () => void
+  closePreviewTab: (path: string) => void
+  closeOtherPreviewTabs: (path: string) => void
+  closeAllPreviewTabs: () => void
   setExternalPreview: (preview: ExternalPreview | null) => void
   setPendingScrollImageSrc: (src: string | null) => void
   setActiveView: (view: WikiState["activeView"]) => void
@@ -488,6 +510,7 @@ export const useWikiStore = create<WikiState>((set) => ({
   fileContent: "",
   previewContentPath: null,
   externalPreview: null,
+  recentPreviewPaths: [],
   previewReturnView: null,
   pendingScrollImageSrc: null,
   activeView: "wiki",
@@ -550,6 +573,7 @@ export const useWikiStore = create<WikiState>((set) => ({
       activeView: "wiki",
       previewReturnView:
         state.activeView === "wiki" ? state.previewReturnView : state.activeView,
+      recentPreviewPaths: pushRecentPreviewPath(state.recentPreviewPaths, selectedFile),
     })),
   openFileInPreview: (selectedFile, fileContent) =>
     set((state) => ({
@@ -560,6 +584,7 @@ export const useWikiStore = create<WikiState>((set) => ({
       activeView: "wiki",
       previewReturnView:
         state.activeView === "wiki" ? state.previewReturnView : state.activeView,
+      recentPreviewPaths: pushRecentPreviewPath(state.recentPreviewPaths, selectedFile),
     })),
   closePreview: () =>
     set((state) => ({
@@ -570,6 +595,11 @@ export const useWikiStore = create<WikiState>((set) => ({
       activeView: state.previewReturnView ?? "wiki",
       previewReturnView: null,
     })),
+  closePreviewTab: (path) =>
+    set((state) => ({ recentPreviewPaths: state.recentPreviewPaths.filter((p) => p !== path) })),
+  closeOtherPreviewTabs: (path) =>
+    set((state) => ({ recentPreviewPaths: state.recentPreviewPaths.filter((p) => p === path) })),
+  closeAllPreviewTabs: () => set({ recentPreviewPaths: [] }),
   setExternalPreview: (externalPreview) => set({ externalPreview }),
   setPendingScrollImageSrc: (pendingScrollImageSrc) => set({ pendingScrollImageSrc }),
   setActiveView: (activeView) => set({ activeView, previewReturnView: null }),

@@ -25,6 +25,7 @@ import { useWikiStore } from "@/stores/wiki-store"
 import { useChatStore } from "@/stores/chat-store"
 import { useUpdateStore, hasAvailableUpdate } from "@/stores/update-store"
 import { useZoomStore } from "@/stores/zoom-store"
+import { useBackgroundStore } from "@/stores/background-store"
 import { loadSourceWatchConfig, saveLanguage, saveTheme, loadTheme } from "@/lib/project-store"
 import { applyTheme, type AppTheme } from "@/lib/theme"
 import type { SettingsDraft, DraftSetter } from "./settings-types"
@@ -106,6 +107,9 @@ function initialDraft(
   projectPath?: string,
   theme?: AppTheme,
   zoomLevel?: number,
+  backgroundImage?: string | null,
+  backgroundOpacity?: number,
+  backgroundBrightness?: number,
 ): SettingsDraft {
   // Show absolute path: if stored path is empty, show default using project path
   // If stored path is relative (legacy), prepend project path
@@ -117,6 +121,8 @@ function initialDraft(
     // Legacy relative path - prepend project path for display
     displayPath = `${projectPath}/${displayPath}`
   }
+
+  const bg = useBackgroundStore.getState()
 
   return {
     provider: llm.provider,
@@ -187,6 +193,9 @@ function initialDraft(
     uiLanguage,
     theme: theme ?? "system",
     zoomLevel: zoomLevel ?? useZoomStore.getState().level,
+    backgroundImage: backgroundImage ?? bg.imageUrl ?? null,
+    backgroundOpacity: backgroundOpacity ?? bg.opacity,
+    backgroundBrightness: backgroundBrightness ?? bg.brightness,
   }
 }
 
@@ -305,6 +314,9 @@ export function SettingsView() {
         project?.path,
         prev.theme,
         prev.zoomLevel,
+        prev.backgroundImage,
+        prev.backgroundOpacity,
+        prev.backgroundBrightness,
       ),
     )
   }, [
@@ -355,6 +367,9 @@ export function SettingsView() {
       loadGeneralConfig,
       saveZoomLevel,
       loadZoomLevel,
+      saveBackgroundImage,
+      saveBackgroundOpacity,
+      saveBackgroundBrightness,
     } = await import("@/lib/project-store")
 
     const newLlm = {
@@ -541,6 +556,14 @@ export function SettingsView() {
       // Apply zoom level
       useZoomStore.getState().setLevel(draft.zoomLevel)
       await saveZoomLevel(draft.zoomLevel)
+
+      // Apply background (image + opacity + brightness)
+      useBackgroundStore.getState().setImage(draft.backgroundImage)
+      useBackgroundStore.getState().setOpacity(draft.backgroundOpacity)
+      useBackgroundStore.getState().setBrightness(draft.backgroundBrightness)
+      await saveBackgroundImage(draft.backgroundImage)
+      await saveBackgroundOpacity(draft.backgroundOpacity)
+      await saveBackgroundBrightness(draft.backgroundBrightness)
 
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)

@@ -74,6 +74,10 @@ export interface SettingsDraft {
   uiLanguage: string
   theme: "light" | "dark" | "system"
   zoomLevel: number
+  /** App background image as a `data:` URL, or null when disabled. */
+  backgroundImage: string | null
+  backgroundOpacity: number
+  backgroundBrightness: number
 
   // General app behavior
   autostart: boolean

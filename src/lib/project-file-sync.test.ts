@@ -474,6 +474,7 @@ describe("project file sync", () => {
       excludeExtensions: [],
       excludeDirs: [],
       excludeGlobs: [],
+      excludedPaths: [],
       maxFileSizeMb: 100,
     })
 

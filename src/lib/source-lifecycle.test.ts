@@ -113,6 +113,7 @@ describe("source-lifecycle path helpers", () => {
         excludeExtensions: ["json"],
         excludeDirs: ["drafts"],
         excludeGlobs: [],
+        excludedPaths: [],
         maxFileSizeMb: 100,
       },
     )
@@ -175,6 +176,7 @@ describe("source-lifecycle path helpers", () => {
         excludeExtensions: [],
         excludeDirs: [],
         excludeGlobs: [],
+        excludedPaths: [],
         maxFileSizeMb: 100,
       },
     )
@@ -246,6 +248,7 @@ describe("source-lifecycle path helpers", () => {
         excludeExtensions: [],
         excludeDirs: ["drafts"],
         excludeGlobs: [],
+        excludedPaths: [],
         maxFileSizeMb: 100,
       },
     )
@@ -284,6 +287,7 @@ describe("source-lifecycle path helpers", () => {
         excludeExtensions: [],
         excludeDirs: [],
         excludeGlobs: [],
+        excludedPaths: [],
         maxFileSizeMb: 100,
       },
     )
@@ -369,6 +373,7 @@ describe("source-lifecycle path helpers", () => {
         excludeExtensions: [],
         excludeDirs: [],
         excludeGlobs: [],
+        excludedPaths: [],
         maxFileSizeMb: 100,
       },
     )
@@ -418,6 +423,7 @@ describe("source import skip reporting", () => {
       excludeExtensions: [],
       excludeDirs: [],
       excludeGlobs: [],
+      excludedPaths: [],
       maxFileSizeMb: 100,
       ...overrides,
     } as never

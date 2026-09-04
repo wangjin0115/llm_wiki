@@ -66,5 +66,6 @@
     "draft-*",
     "*.private.*"
   ],
+  "excludedPaths": [],
   "maxFileSizeMb": 100
 }

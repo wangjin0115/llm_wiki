@@ -151,7 +151,6 @@
   #root {
     box-sizing: border-box;
     height: 100vh;
-    background: var(--background);
     }
   html {
     @apply font-sans;

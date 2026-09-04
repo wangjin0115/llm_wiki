@@ -4,6 +4,7 @@ import type { ApiConfig, CustomLlmPreset, GeneralConfig, LlmConfig, SearchApiCon
 import { normalizeSourceWatchConfig } from "@/lib/source-watch-config"
 import { normalizePath } from "@/lib/path-utils"
 import { DEFAULT_ZOOM_LEVEL, clampZoomLevel } from "@/stores/zoom-store"
+import { DEFAULT_BACKGROUND_OPACITY, DEFAULT_BACKGROUND_BRIGHTNESS } from "@/stores/background-store"
 
 const STORE_NAME = "app-state.json"
 const RECENT_PROJECTS_KEY = "recentProjects"
@@ -402,6 +403,45 @@ export async function saveTheme(theme: "light" | "dark" | "system"): Promise<voi
 export async function loadTheme(): Promise<"light" | "dark" | "system" | null> {
   const store = await getStore()
   return (await store.get<"light" | "dark" | "system">(THEME_KEY)) ?? null
+}
+
+const BACKGROUND_IMAGE_KEY = "backgroundImage"
+const BACKGROUND_OPACITY_KEY = "backgroundOpacity"
+const BACKGROUND_BRIGHTNESS_KEY = "backgroundBrightness"
+
+export async function saveBackgroundImage(dataUrl: string | null): Promise<void> {
+  const store = await getStore()
+  await store.set(BACKGROUND_IMAGE_KEY, dataUrl)
+  await store.save()
+}
+
+export async function loadBackgroundImage(): Promise<string | null> {
+  const store = await getStore()
+  return (await store.get<string | null>(BACKGROUND_IMAGE_KEY)) ?? null
+}
+
+export async function saveBackgroundOpacity(opacity: number): Promise<void> {
+  const store = await getStore()
+  await store.set(BACKGROUND_OPACITY_KEY, opacity)
+  await store.save()
+}
+
+export async function loadBackgroundOpacity(): Promise<number> {
+  const store = await getStore()
+  const opacity = await store.get<number>(BACKGROUND_OPACITY_KEY)
+  return typeof opacity === "number" ? opacity : DEFAULT_BACKGROUND_OPACITY
+}
+
+export async function saveBackgroundBrightness(brightness: number): Promise<void> {
+  const store = await getStore()
+  await store.set(BACKGROUND_BRIGHTNESS_KEY, brightness)
+  await store.save()
+}
+
+export async function loadBackgroundBrightness(): Promise<number> {
+  const store = await getStore()
+  const brightness = await store.get<number>(BACKGROUND_BRIGHTNESS_KEY)
+  return typeof brightness === "number" ? brightness : DEFAULT_BACKGROUND_BRIGHTNESS
 }
 
 const OUTPUT_LANGUAGE_KEY = "outputLanguage"

@@ -20,6 +20,7 @@ export interface Conversation {
   title: string
   createdAt: number
   updatedAt: number
+  favorited?: boolean
   selectedSkills?: string[]
   contextFiles?: string[]
 }
@@ -70,6 +71,7 @@ interface ChatState {
   deleteConversation: (id: string) => void
   setActiveConversation: (id: string | null) => void
   renameConversation: (id: string, title: string) => void
+  toggleFavorite: (id: string) => void
 
   // Message management
   addMessage: (role: DisplayMessage["role"], content: string, images?: MessageImage[]) => void
@@ -175,6 +177,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       conversations: state.conversations.map((c) =>
         c.id === id ? { ...c, title, updatedAt: Date.now() } : c
+      ),
+    })),
+
+  toggleFavorite: (id) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === id ? { ...c, favorited: !c.favorited } : c
       ),
     })),
 

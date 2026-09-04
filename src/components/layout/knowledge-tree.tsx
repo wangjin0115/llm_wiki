@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
-  FileText, Users, Lightbulb, BookOpen, HelpCircle, GitMerge, BarChart3, TrendingUp, Target, ChevronRight, ChevronDown, Layout, Globe, Trash2, LoaderCircle,
+  FileText, Users, Lightbulb, BookOpen, HelpCircle, GitMerge, BarChart3, TrendingUp, Target, ChevronRight, ChevronDown, Layout, Globe, Trash2, LoaderCircle, FolderSearch,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { useWikiStore } from "@/stores/wiki-store"
-import { readFile, listDirectory } from "@/commands/fs"
+import { readFile, listDirectory, revealInFileManager } from "@/commands/fs"
 import type { FileNode } from "@/types/wiki"
-import { normalizePath } from "@/lib/path-utils"
+import { isAbsolutePath, normalizePath } from "@/lib/path-utils"
 import { refreshProjectFileTree } from "@/lib/project-file-tree-refresh"
 import { cascadeDeleteWikiPagesWithRefs } from "@/lib/wiki-page-delete"
 import { inferWikiTypeFromPath, wikiTypeLabel } from "@/lib/wiki-page-types"
@@ -44,6 +44,25 @@ function typeConfig(type: string): { icon: typeof FileText; label: string; color
   return TYPE_CONFIG[type] ?? { icon: FileText, label: wikiTypeLabel(type), color: "text-muted-foreground", order: 99 }
 }
 
+/** 在系统资源管理器中打开文件所在目录并选中（与文件树 behavior 一致）。 */
+function useRevealInFileManager() {
+  const { t } = useTranslation()
+  const project = useWikiStore((s) => s.project)
+  return useCallback(async (path: string) => {
+    const pp = project ? normalizePath(project.path) : ""
+    const full = isAbsolutePath(path)
+      ? normalizePath(path)
+      : pp
+        ? `${pp}/${normalizePath(path)}`
+        : path
+    try {
+      await revealInFileManager(full)
+    } catch (err) {
+      console.error("[KnowledgeTree] reveal failed:", err)
+    }
+  }, [project, t])
+}
+
 /** Run async tasks with bounded concurrency. The wiki page list is large
  *  (thousands of files) and each is read over IPC; reading them all serially
  *  is slow, and launching thousands at once can overwhelm the IPC bridge. */
@@ -77,6 +96,7 @@ export function KnowledgeTree() {
   // Only one row armed at a time (clicking another row replaces).
   const [armedPath, setArmedPath] = useState<string | null>(null)
   const [deletingPath, setDeletingPath] = useState<string | null>(null)
+  const handleReveal = useRevealInFileManager()
 
   const loadReqIdRef = useRef(0)
 
@@ -303,6 +323,16 @@ export function KnowledgeTree() {
                           {page.origin === "web-clip" && <Globe className="h-3 w-3 shrink-0 text-blue-400" />}
                           <span className="truncate">{page.title}</span>
                         </button>
+                        <button
+                          onClick={() => void handleReveal(page.path)}
+                          className={`shrink-0 rounded p-1 text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground ${
+                            isArmed || isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                          }`}
+                          title={t("fileTree.revealInExplorer", { defaultValue: "Open in file manager" })}
+                          aria-label={t("fileTree.revealInExplorer", { defaultValue: "Open in file manager" })}
+                        >
+                          <FolderSearch className="h-3.5 w-3.5" />
+                        </button>
                         <DeleteButton
                           armed={isArmed}
                           deleting={isDeleting}
@@ -338,6 +368,7 @@ function RawSourcesSection() {
   const project = useWikiStore((s) => s.project)
   const openPathInPreview = useWikiStore((s) => s.openPathInPreview)
   const selectedFile = useWikiStore((s) => s.selectedFile)
+  const handleReveal = useRevealInFileManager()
   const [expanded, setExpanded] = useState(false)
   const [sources, setSources] = useState<FileNode[]>([])
 
@@ -380,17 +411,32 @@ function RawSourcesSection() {
           {sources.map((file) => {
             const isSelected = selectedFile === file.path
             return (
-              <button
+              <div
                 key={file.path}
-                onClick={() => openPathInPreview(file.path)}
-                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-sm ${
-                  isSelected
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+                className={`group flex items-center gap-1 rounded-md ${
+                  isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
                 }`}
               >
-                <span className="truncate">{file.name}</span>
-              </button>
+                <button
+                  onClick={() => openPathInPreview(file.path)}
+                  className={`flex flex-1 items-center gap-1.5 px-2 py-1 text-left text-sm min-w-0 ${
+                    isSelected
+                      ? "text-accent-foreground"
+                      : "text-muted-foreground group-hover:text-accent-foreground"
+                  }`}
+                  title={file.path}
+                >
+                  <span className="truncate">{file.name}</span>
+                </button>
+                <button
+                  onClick={() => void handleReveal(file.path)}
+                  className="mr-1 shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                  title={t("fileTree.revealInExplorer", { defaultValue: "Open in file manager" })}
+                  aria-label={t("fileTree.revealInExplorer", { defaultValue: "Open in file manager" })}
+                >
+                  <FolderSearch className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )
           })}
         </div>

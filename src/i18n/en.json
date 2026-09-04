@@ -105,6 +105,9 @@
     "done": "Done",
     "editRaw": "Edit raw Markdown",
     "doneEditing": "Done editing",
+    "reader": {
+      "linkNotFound": "No file found for \"{{target}}\""
+    },
     "selection": {
       "askAgent": "Ask Agent about selection",
       "placeholder": "Explain, rewrite, shorten...",
@@ -125,6 +128,7 @@
       "saveToConversation": "Save to conversation",
       "viewInConversation": "View conversation",
       "exitConversation": "Exit conversation",
+      "conversationNamePlaceholder": "Name this conversation",
       "requestFailed": "The selection assistant could not complete this request.",
       "applyFailed": "The selected text could not be updated.",
       "sourceChanged": "The file changed after this text was selected. Select the text again before applying the edit.",
@@ -148,7 +152,12 @@
     },
     "frontmatter": {
       "origin": "Origin",
-      "more": "More"
+      "more": "More",
+      "sourceLocal": "Open source file: {{name}}",
+      "sourceExternal": "Open external link: {{url}}",
+      "sourceMissing": "Source not found: no \"{{name}}\" in raw/sources/ and not a valid URL",
+      "relatedOpen": "Open related page: {{slug}}",
+      "relatedMissing": "Related page not found: no \"{{slug}}\" in wiki/"
     },
     "rawMarkdownEditor": "Raw Markdown editor"
   },
@@ -1171,6 +1180,9 @@
     }
   },
   "preview": {
+    "closeTab": "Close tab",
+    "closeOtherTabs": "Close other tabs",
+    "closeAllTabs": "Close all tabs",
     "selectFile": "Select a file to preview",
     "notAvailable": "Preview not available for this file type",
     "viewAsText": "View as text",

@@ -105,6 +105,9 @@
     "done": "Fatto",
     "editRaw": "Modifica il Markdown grezzo",
     "doneEditing": "Fine modifica",
+    "reader": {
+      "linkNotFound": "Nessun file trovato per \"{{target}}\""
+    },
     "selection": {
       "askAgent": "Chiedi all'Agente sulla selezione",
       "placeholder": "Spiega, riscrivi, accorcia...",
@@ -125,6 +128,7 @@
       "saveToConversation": "Salva nella conversazione",
       "viewInConversation": "Visualizza conversazione",
       "exitConversation": "Esci dalla conversazione",
+      "conversationNamePlaceholder": "Nome della conversazione",
       "requestFailed": "L'assistente di selezione non è riuscito a completare la richiesta.",
       "applyFailed": "Non è stato possibile aggiornare il testo selezionato.",
       "sourceChanged": "Il file è cambiato dopo la selezione del testo. Seleziona di nuovo il testo prima di applicare la modifica.",
@@ -148,7 +152,12 @@
     },
     "frontmatter": {
       "origin": "Origine",
-      "more": "Altro"
+      "more": "Altro",
+      "sourceLocal": "Apri file sorgente: {{name}}",
+      "sourceExternal": "Apri link esterno: {{url}}",
+      "sourceMissing": "Sorgente non trovata: nessun \"{{name}}\" in raw/sources/ e non è un URL valido",
+      "relatedOpen": "Apri pagina correlata: {{slug}}",
+      "relatedMissing": "Pagina correlata non trovata: nessun \"{{slug}}\" in wiki/"
     },
     "rawMarkdownEditor": "Editor Markdown grezzo"
   },
@@ -1171,6 +1180,9 @@
     }
   },
   "preview": {
+    "closeTab": "Chiudi scheda",
+    "closeOtherTabs": "Chiudi le altre schede",
+    "closeAllTabs": "Chiudi tutte le schede",
     "selectFile": "Seleziona un file da visualizzare",
     "notAvailable": "Anteprima non disponibile per questo tipo di file",
     "viewAsText": "Visualizza come testo",

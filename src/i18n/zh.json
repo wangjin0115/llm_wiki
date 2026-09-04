@@ -105,6 +105,9 @@
     "done": "完成",
     "editRaw": "编辑原始 Markdown",
     "doneEditing": "完成编辑",
+    "reader": {
+      "linkNotFound": "未找到「{{target}}」对应的文件"
+    },
     "selection": {
       "askAgent": "让 Agent 处理选中内容",
       "placeholder": "解释、改写、缩短……",
@@ -125,6 +128,7 @@
       "saveToConversation": "保存到对话",
       "viewInConversation": "查看对话",
       "exitConversation": "退出当前对话",
+      "conversationNamePlaceholder": "输入新对话命名",
       "requestFailed": "选区助手未能完成本次请求。",
       "applyFailed": "无法更新选中的文本。",
       "sourceChanged": "选中文本后文件已经发生变化。请重新选择文本，再应用修改。",
@@ -148,7 +152,12 @@
     },
     "frontmatter": {
       "origin": "来源",
-      "more": "更多"
+      "more": "更多",
+      "sourceLocal": "打开源文件：{{name}}",
+      "sourceExternal": "打开外部链接：{{url}}",
+      "sourceMissing": "未找到源文件：raw/sources/ 下没有 \"{{name}}\"，也不是有效链接",
+      "relatedOpen": "打开关联页面：{{slug}}",
+      "relatedMissing": "关联页面不存在：wiki/ 下没有 \"{{slug}}\""
     },
     "rawMarkdownEditor": "Markdown 源码编辑器"
   },
@@ -1171,6 +1180,9 @@
     }
   },
   "preview": {
+    "closeTab": "关闭标签",
+    "closeOtherTabs": "关闭其他标签",
+    "closeAllTabs": "关闭所有标签",
     "selectFile": "选择文件以预览",
     "notAvailable": "该文件类型暂不支持预览",
     "viewAsText": "作为文本查看",

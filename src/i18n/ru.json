@@ -105,6 +105,9 @@
     "done": "Готово",
     "editRaw": "Редактировать исходный Markdown",
     "doneEditing": "Завершить редактирование",
+    "reader": {
+      "linkNotFound": "Файл для «{{target}}» не найден"
+    },
     "selection": {
       "askAgent": "Спросить агента о выделенном",
       "placeholder": "Объяснить, переписать, сократить...",
@@ -125,6 +128,7 @@
       "saveToConversation": "Сохранить в чат",
       "viewInConversation": "Просмотреть чат",
       "exitConversation": "Выйти из разговора",
+      "conversationNamePlaceholder": "Название разговора",
       "requestFailed": "Ассистенту не удалось выполнить этот запрос.",
       "applyFailed": "Не удалось обновить выделенный текст.",
       "sourceChanged": "Файл изменился после выделения этого текста. Выделите текст заново перед применением изменения.",
@@ -148,7 +152,12 @@
     },
     "frontmatter": {
       "origin": "Источник",
-      "more": "Ещё"
+      "more": "Ещё",
+      "sourceLocal": "Открыть исходный файл: {{name}}",
+      "sourceExternal": "Открыть внешнюю ссылку: {{url}}",
+      "sourceMissing": "Источник не найден: нет \"{{name}}\" в raw/sources/ и не является допустимой ссылкой",
+      "relatedOpen": "Открыть связанную страницу: {{slug}}",
+      "relatedMissing": "Связанная страница не найдена: нет \"{{slug}}\" в wiki/"
     },
     "rawMarkdownEditor": "Редактор исходного Markdown"
   },
@@ -1171,6 +1180,9 @@
     }
   },
   "preview": {
+    "closeTab": "Закрыть вкладку",
+    "closeOtherTabs": "Закрыть другие вкладки",
+    "closeAllTabs": "Закрыть все вкладки",
     "selectFile": "Выберите файл для предпросмотра",
     "notAvailable": "Предпросмотр недоступен для этого типа файлов",
     "viewAsText": "Просмотреть как текст",

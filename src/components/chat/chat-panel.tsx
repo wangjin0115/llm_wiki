@@ -346,6 +346,12 @@ function ConversationSidebar({
             } else {
               createConversation()
             }
+            // 新建后直接进入行内命名输入；留空回车则保留默认标题
+            const newId = useChatStore.getState().activeConversationId
+            if (newId) {
+              setEditingId(newId)
+              setEditingTitle("")
+            }
           }}
         >
           <Plus className="h-3.5 w-3.5" />

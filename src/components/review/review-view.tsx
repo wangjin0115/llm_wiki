@@ -9,7 +9,6 @@ import {
   MessageSquare,
   X,
   Check,
-  Trash2,
   RotateCcw,
   Link2,
   Loader2,

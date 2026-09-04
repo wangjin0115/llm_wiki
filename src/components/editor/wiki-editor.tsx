@@ -44,6 +44,35 @@ interface WikiEditorProps {
 const StableWikiReader = memo(WikiReader)
 const StableFrontmatterPanel = memo(FrontmatterPanel)
 
+// One completed Q&A turn in the selection panel. Memoized so that while the
+// next answer streams in (every token re-renders the sidebar), finished turns
+// are skipped instead of re-parsing their whole Markdown through WikiReader.
+// Props stay stable during streaming: turn objects are never mutated,
+// filePath doesn't change mid-request, and onOpenCitation is a useCallback.
+const SelectionTurnItem = memo(function SelectionTurnItem({
+  turn,
+  filePath,
+  onOpenCitation,
+}: {
+  turn: SelectionConversationTurn
+  filePath?: string
+  onOpenCitation: (reference: SearchResult) => void
+}) {
+  return (
+    <div className="mb-4 space-y-2 border-b border-border/60 pb-4">
+      <div className="ml-6 rounded-md bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">{turn.question}</div>
+      <WikiReader body={turn.answer} filePath={filePath} />
+      {turn.references.length > 0 && (
+        <div className="flex flex-wrap gap-1 pt-1">
+          {turn.references.map((reference, referenceIndex) => (
+            <button key={reference.path} type="button" onClick={() => void onOpenCitation(reference)} title={reference.path} className="max-w-full truncate rounded border border-border px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground">[{referenceIndex + 1}] {reference.title}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+})
+
 export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
   const { t } = useTranslation()
   // Default to read mode (ReactMarkdown render). Edit mode is a raw Markdown
@@ -81,6 +110,14 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
   const allMessages = useChatStore((state) => state.messages)
   const finalizeStreamForConversation = useChatStore((state) => state.finalizeStreamForConversation)
   const [selectionConversationId, setSelectionConversationId] = useState<string | null>(null)
+  const renameConversation = useChatStore((state) => state.renameConversation)
+  // 已绑定对话的命名（用于头部展示）；未绑定时为「保存到对话」准备的新命名输入。
+  const selectionConversation = useChatStore((state) =>
+    state.conversations.find((conversation) => conversation.id === selectionConversationId)
+  )
+  const [newConversationTitle, setNewConversationTitle] = useState("")
+  // 点「保存到对话」后才展开命名输入框（而不是常驻显示）
+  const [showSaveNamingInput, setShowSaveNamingInput] = useState(false)
 
   // Read mode renders frontmatter as UI plus the Markdown body. Edit mode uses
   // a plain-text Markdown editor for the full file so frontmatter can be edited
@@ -208,6 +245,17 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
     selectionAbortRef.current?.abort()
   }, [])
 
+  // 把尚未落库的面板轮次写入绑定的会话（savedTurnCountRef 记录进度）。
+  // 仅在已绑定对话时由自动保存/手动保存复用；未绑定时面板轮次只在内存。
+  const persistTurnsToConversation = useCallback((conversationId: string, turns: SelectionConversationTurn[]) => {
+    const newTurns = turns.slice(savedTurnCountRef.current)
+    newTurns.forEach((turn) => {
+      addMessageToConversation(conversationId, "user", turn.question)
+      finalizeStreamForConversation(conversationId, turn.answer, turn.references)
+    })
+    savedTurnCountRef.current = turns.length
+  }, [addMessageToConversation, finalizeStreamForConversation])
+
   const submitSelectionToAgent = useCallback(async (intent: "ask" | "edit") => {
     // A selection always takes precedence over general chat mode: as soon as
     // a selection request exists we run in selection mode, regardless of the
@@ -231,6 +279,12 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
     const runId = ++selectionRunIdRef.current
     setSelectionRunning(true)
     const instruction = selectionInstruction.trim()
+    // Snapshot the history inputs before the first await below: refs are read
+    // live, so if the conversation is saved while searchWiki is in flight,
+    // savedTurnCountRef would jump and silently drop unsaved turns from the
+    // request context.
+    const turnsAtSubmit = selectionTurns
+    const savedCountAtSubmit = savedTurnCountRef.current
     const projectRoot = project ? normalizePath(project.path).replace(/\/+$/, "") : ""
     const relativeFilePath = selectionRequest && projectRoot && normalizePath(selectionRequest.filePath).startsWith(`${projectRoot}/`)
       ? normalizePath(selectionRequest.filePath).slice(projectRoot.length + 1)
@@ -284,13 +338,13 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
             role: m.role,
             content: m.content,
           })),
-          ...selectionTurns.slice(savedTurnCountRef.current).flatMap((turn) => [
+          ...turnsAtSubmit.slice(savedCountAtSubmit).flatMap((turn) => [
             { role: "user" as const, content: turn.question },
             { role: "assistant" as const, content: turn.answer.slice(-6000) },
           ]),
         ].slice(-12)
       : // 选中文本模式：使用有限的 selectionTurns（避免超出模型窗口）
-        selectionTurns.slice(-6).flatMap((turn) => [
+        turnsAtSubmit.slice(-6).flatMap((turn) => [
           { role: "user" as const, content: turn.question },
           { role: "assistant" as const, content: turn.answer.slice(-6000) },
         ])
@@ -309,9 +363,15 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
             if (intent === "ask") {
               setSelectionResult(null)
               if (accumulated.trim()) {
+                // 已绑定对话：本轮（含之前未落库的轮次）自动写入该会话；
+                // 未绑定：轮次只留在面板，等用户点「保存到对话」。
+                if (selectionConversationId) {
+                  persistTurnsToConversation(
+                    selectionConversationId,
+                    [...selectionTurns, { question: instruction, answer: accumulated, references }],
+                  )
+                }
                 setSelectionTurns((turns) => [...turns, { question: instruction, answer: accumulated, references }])
-                // Do NOT auto-save to chat-store. Conversation is only
-                // persisted when the user clicks "保存到对话".
                 setSelectionInstruction("")
               } else {
                 setSelectionError(t("editor.selection.emptyResponse"))
@@ -335,7 +395,7 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
       setSelectionError(t("editor.selection.requestFailed"))
       setSelectionRunning(false)
     }
-  }, [allMessages, llmConfig, onSave, project, selectionConversationId, selectionInstruction, selectionMode, selectionRequest, selectionRunning, selectionTurns, t])
+  }, [allMessages, llmConfig, onSave, persistTurnsToConversation, project, selectionConversationId, selectionInstruction, selectionMode, selectionRequest, selectionRunning, selectionTurns, t])
 
   const acceptSelectionEdit = useCallback(async () => {
     if (!project || !selectionRequest?.sourceMapped || selectionResult?.intent !== "edit") return
@@ -394,7 +454,7 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
       // Keep the dialog and its state: selectionRequest, selectionTurns,
       // isGeneralChatMode, selectionConversationId all stay as-is.
     }
-    previousFilePathRef.current = filePath
+    previousFilePathRef.current = filePath ?? null
   }, [filePath, editableMarkdown])
 
   const switchToGeneralChat = useCallback(() => {
@@ -424,23 +484,29 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
     setSelectionConversationId(null)
     setSelectionTurns([])
     savedTurnCountRef.current = 0
+    setNewConversationTitle("")
+    setShowSaveNamingInput(false)
     setCitationPreview(null)
   }, [])
 
   const handleSaveToConversation = useCallback(() => {
     // Create a conversation on first save; reuse it afterwards.
     const targetId = selectionConversationId ?? createConversation()
-    if (!selectionConversationId) setSelectionConversationId(targetId)
-    // Only save turns not yet persisted (tracked by savedTurnCountRef).
-    const newTurns = selectionTurns.slice(savedTurnCountRef.current)
-    newTurns.forEach((turn) => {
-      addMessageToConversation(targetId, "user", turn.question)
-      finalizeStreamForConversation(targetId, turn.answer, turn.references)
-    })
-    savedTurnCountRef.current = selectionTurns.length
+    if (!selectionConversationId) {
+      setSelectionConversationId(targetId)
+      setNewConversationTitle("")
+      setShowSaveNamingInput(false)
+    }
+    persistTurnsToConversation(targetId, selectionTurns)
+    // 用户命名必须放在消息写入之后：chat-store 会在首条 user 消息落库时
+    // 自动把会话标题覆盖为问题前 50 字，先改名会被这次 auto-title 冲掉。
+    if (!selectionConversationId) {
+      const title = newConversationTitle.trim()
+      if (title) renameConversation(targetId, title)
+    }
     setActiveConversation(targetId)
     setActiveView("chat")
-  }, [selectionConversationId, createConversation, selectionTurns, addMessageToConversation, finalizeStreamForConversation, setActiveConversation, setActiveView])
+  }, [selectionConversationId, newConversationTitle, renameConversation, createConversation, selectionTurns, persistTurnsToConversation, setActiveConversation, setActiveView])
 
   const stopSelectionRun = useCallback(() => {
     selectionRunIdRef.current += 1
@@ -541,7 +607,9 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
         <aside className="flex h-full w-[360px] max-w-[45%] shrink-0 flex-col border-l border-border bg-background" aria-label={isGeneralChatMode ? t("chat.title") : t("editor.selection.askAgent")}>
           <header className="flex min-h-11 items-center gap-2 border-b border-border px-3 py-2">
             <Sparkles className="h-4 w-4 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{t("editor.selection.askAgent")}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium" title={selectionConversation?.title}>
+              {selectionConversation ? selectionConversation.title : t("editor.selection.askAgent")}
+            </span>
             {selectionConversationId && (
               <>
                 <button
@@ -586,17 +654,12 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
               </p>
             )}
             {selectionTurns.map((turn, index) => (
-              <div key={`${index}:${turn.question}`} className="mb-4 space-y-2 border-b border-border/60 pb-4">
-                <div className="ml-6 rounded-md bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">{turn.question}</div>
-                <WikiReader body={turn.answer} filePath={selectionRequest?.filePath} />
-                {turn.references.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {turn.references.map((reference, referenceIndex) => (
-                      <button key={reference.path} type="button" onClick={() => void openCitation(reference)} title={reference.path} className="max-w-full truncate rounded border border-border px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground">[{referenceIndex + 1}] {reference.title}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <SelectionTurnItem
+                key={`${index}:${turn.question}`}
+                turn={turn}
+                filePath={selectionRequest?.filePath}
+                onOpenCitation={openCitation}
+              />
             ))}
             {citationPreview && (
               <section className="mb-4 overflow-hidden rounded-md border border-border bg-background">
@@ -676,10 +739,36 @@ export function WikiEditor({ content, onSave, filePath }: WikiEditorProps) {
                 </>
               ) : !selectionResult ? (
                 <>
-                  {/* Save to Conversation button */}
+                  {/* 未绑定对话时：点「保存到对话」后弹出命名输入，确认才创建 */}
+                  {!selectionConversationId && showSaveNamingInput && (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newConversationTitle}
+                      onChange={(event) => setNewConversationTitle(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault()
+                          handleSaveToConversation()
+                        } else if (event.key === "Escape") {
+                          setShowSaveNamingInput(false)
+                          setNewConversationTitle("")
+                        }
+                      }}
+                      placeholder={t("editor.selection.conversationNamePlaceholder")}
+                      className="mr-auto min-w-0 max-w-[180px] flex-none rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+                    />
+                  )}
+                  {/* Save to Conversation button: first click shows naming input, second click (or Enter) confirms */}
                   <button
                     type="button"
-                    onClick={handleSaveToConversation}
+                    onClick={() => {
+                      if (selectionConversationId || showSaveNamingInput) {
+                        handleSaveToConversation()
+                      } else {
+                        setShowSaveNamingInput(true)
+                      }
+                    }}
                     className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     {selectionConversationId ? t("editor.selection.viewInConversation") : t("editor.selection.saveToConversation")}

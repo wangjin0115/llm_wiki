@@ -52,7 +52,8 @@
     "settingsShortcut": " (Cmd/Ctrl+,)",
     "switchProject": "Cambia progetto",
     "updateAvailable": "Aggiornamento disponibile",
-    "updateAvailableSuffix": " · aggiorna"
+    "updateAvailableSuffix": " · aggiorna",
+    "jira": "Jira"
   },
   "updateBanner": {
     "message": "La versione {{version}} è disponibile",
@@ -276,6 +277,7 @@
       "unsupported-type": "Questo tipo di file non è supportato per l'acquisizione.",
       "sensitive-config": "I file di configurazione non possono essere acquisiti.",
       "no-llm": "Nessun LLM utilizzabile configurato. Imposta un modello o una chiave API nelle Impostazioni.",
+      "all-excluded": "Tutte le fonti di questa cartella sono escluse dall'acquisizione.",
       "unknown": "Questo file non può essere acquisito."
     },
     "ingestStatus": {
@@ -303,6 +305,11 @@
     "searchPlaceholder": "Filtra le fonti per nome o percorso",
     "clearSearch": "Cancella filtro fonti",
     "noSearchResults": "Nessuna fonte corrisponde a “{{query}}”",
+    "filterByIngestStatus": "Filtra per stato di acquisizione",
+    "filterAll": "Tutti i file",
+    "filterIngested": "Acquisiti",
+    "filterNotIngested": "Da acquisire",
+    "noIngestFilterResults": "Nessuna fonte corrisponde al filtro attuale",
     "filteredSourceCount": "{{count}} di {{total}} fonti",
     "sourceCount_plural": "{{count}} fonti"
   },
@@ -627,7 +634,8 @@
       "interface": "Interfaccia",
       "maintenance": "Manutenzione",
       "changelog": "Changelog",
-      "about": "Informazioni"
+      "about": "Informazioni",
+      "jira": "Jira"
     },
     "sections": {
       "general": {
@@ -780,7 +788,7 @@
         "overlapChunkChars": "Sovrapposizione (caratteri)",
         "overlapChunkCharsHint": "Caratteri di sovrapposizione tra chunk adiacenti, così i concetti non vengono spezzati ai bordi.",
         "concurrency": "Richieste in parallelo",
-        "concurrencyHint": "Numero massimo di richieste di embedding contemporanee (1–32). Aumentalo gradualmente in base alla capacità del tuo endpoint.",
+        "concurrencyHint": "Numero massimo di richieste di embedding contemporanee (1–64). Aumentalo gradualmente in base alla capacità del tuo endpoint.",
         "batchSize": "Input per richiesta",
         "batchSizeHint": "Solo endpoint compatibili OpenAI (1–64). I provider non supportati usano automaticamente richieste a input singolo.",
         "providerTests": "Test del provider",
@@ -898,6 +906,8 @@
         "description": "Controlla raw/sources per intercettare modifiche esterne e scegli quali file possono entrare nell'elaborazione automatica.",
         "enable": "Monitora la cartella fonti del progetto",
         "enableDescription": "Aggiorna la vista Fonti e indicizza i file consentiti nuovi o modificati sotto raw/sources.",
+        "allProjects": "Monitora tutti i progetti recenti",
+        "allProjectsDescription": "Controlla le cartelle delle fonti di tutti i progetti recenti con il monitoraggio attivo. Le modifiche in background vengono accodate nel progetto corrispondente ed eseguite quando viene aperto.",
         "autoIngest": "Elabora automaticamente i file sorgente consentiti",
         "autoIngestDescription": "Se disattivo, le modifiche esterne aggiornano comunque l'albero dei file ma non creano attività di elaborazione.",
         "persistExtractedMarkdown": "Conserva il Markdown estratto",
@@ -1176,6 +1186,35 @@
         "testing": "Test in corso...",
         "testSuccess": "Connessione riuscita",
         "testFailed": "Test non riuscito"
+      },
+      "jira": {
+        "title": "Integrazione Jira",
+        "description": "Connetti un’istanza Jira Server / Data Center per cercare issue ed esportarle nel progetto come documenti Markdown.",
+        "baseUrl": "Indirizzo del server",
+        "baseUrlHint": "La radice dell’istanza, es. https://jira.example.com. Le credenziali usano HTTP Basic, quindi un accesso solo SSO non funziona.",
+        "username": "Nome utente",
+        "password": "Password",
+        "showPassword": "Mostra password",
+        "hidePassword": "Nascondi password",
+        "testConnection": "Prova connessione",
+        "testRunning": "Verifica…",
+        "testOk": "Connesso a {{title}} (Jira {{version}})",
+        "passwordWarningTitle": "La password è memorizzata in chiaro",
+        "passwordWarning": "Come le altre chiavi API di questa applicazione, viene scritta senza cifratura nel file di stato dell’applicazione. Chi può leggere quel file può leggere la password.",
+        "acceptInvalidCerts": "Ignora la verifica del certificato TLS",
+        "acceptInvalidCertsHint": "Necessario per un’istanza intranet il cui certificato non è nell’archivio attendibile di sistema. Rende però la connessione intercettabile da un man in the middle: attivalo solo se il problema è davvero il certificato.",
+        "userAgent": "User-Agent",
+        "userAgentHint": "Alcuni gateway aziendali lasciano passare solo client noti. Mantieni il valore predefinito salvo rifiuto da parte di un proxy.",
+        "exportTitle": "Esportazione",
+        "exportDir": "Cartella di esportazione",
+        "exportDirHint": "I percorsi relativi sono risolti rispetto alla radice del progetto. Attualmente:",
+        "maxAttachmentMb": "Allegato massimo da scaricare (MB)",
+        "maxAttachmentMbHint": "Gli allegati più grandi sono comunque elencati nel documento con il loro nome, ma non vengono scaricati.",
+        "processFieldId": "Id del campo 「Task process description」",
+        "processFieldIdHint": "Il campo personalizzato mostrato come 任务过程描述. Lo trovi nella vista XML/JSON della issue; lascia vuoto se l’istanza non ha questo campo.",
+        "searchTitle": "Ricerca",
+        "scopeJql": "Ambito JQL",
+        "scopeJqlHint": "Aggiunto in AND a ogni ricerca. Vuoto significa tutta l’istanza; un ambito come project = AERDM o updated >= -365d rende utile la scansione delle issue recenti."
       }
     }
   },
@@ -1313,6 +1352,7 @@
     "communitiesLabel": "Comunità",
     "showAll": "Mostra tutto",
     "cluster": "Cluster {{id}}",
+    "lowInternalConnectivity": "Connettività interna bassa: {{count}} link per pagina",
     "surprisingConnections": "Connessioni inaspettate",
     "knowledgeGaps": "Lacune di conoscenza",
     "deepResearch": "Deep Research",
@@ -1340,5 +1380,71 @@
     "minutesAgo": "{{count}} min fa",
     "hoursAgo": "{{count}} h fa",
     "daysAgo": "{{count}} g fa"
+  },
+  "jira": {
+    "search": {
+      "submit": "Cerca",
+      "limit": "{{count}} risultati",
+      "limitHint": "Numero massimo di issue per ricerca",
+      "dimTitle": "Titolo",
+      "dimKeyword": "Parola chiave",
+      "dimIssueKey": "Chiave issue",
+      "dimsHint": "Scegli dove cercare: titolo, testo completo o chiave issue (più chiavi separate da virgole). Le modifiche rilanciano subito la ricerca.",
+      "searching": "Ricerca…",
+      "empty": "Digita una parola chiave e cerca, oppure premi semplicemente Cerca per sfogliare le issue aggiornate di recente.",
+      "noMatch": "Nessuna issue corrisponde al filtro attuale.",
+      "found": "{{count}} issue corrispondenti",
+      "swept": "Sono state scansionate anche le {{count}} issue aggiornate più di recente",
+      "limitReached": "limite di scansione raggiunto ({{count}})",
+      "loadMore": "Scansiona issue più vecchie",
+      "unconfigured": "Jira non è ancora configurato. Inserisci indirizzo del server, nome utente e password in Impostazioni → Jira."
+    },
+    "error": {
+      "title": "La richiesta a Jira non è riuscita",
+      "config": "Jira non è configurato",
+      "auth": "Autenticazione non riuscita: controlla nome utente e password.",
+      "notFound": "Issue non trovata.",
+      "network": "Impossibile raggiungere Jira."
+    },
+    "export": {
+      "export": "Esporta",
+      "exporting": "Esportazione…",
+      "exportingAttachments": "allegati {{completed}}/{{total}}",
+      "reExport": "Esporta di nuovo",
+      "retry": "Riprova",
+      "done": "Esportato in {{path}}",
+      "overwriteMessage": "{{path}} esiste già. Sostituirlo?",
+      "overwriteConfirm": "Sostituisci"
+    },
+    "exported": {
+      "loading": "Caricamento…",
+      "empty": "Nessuna issue è stata ancora esportata.",
+      "open": "Apri",
+      "reveal": "Mostra nella cartella",
+      "reExport": "Esporta di nuovo",
+      "history": "{{count}} esportazioni precedenti di questa issue sono ancora su disco",
+      "openFailed": "Impossibile aprire il file esportato: {{error}}"
+    },
+    "searchPlaceholder": "Cerca issue per titolo o etichetta…",
+    "filter": {
+      "project": "Progetto",
+      "issuetype": "Tipo",
+      "status": "Stato",
+      "assignee": "Assegnatario",
+      "reporter": "Autore",
+      "all": "Tutti",
+      "searchPlaceholder": "Digita per filtrare, es. Wang",
+      "loading": "Caricamento opzioni filtro…",
+      "unassigned": "Non assegnato",
+      "clear": "Cancella filtri"
+    },
+    "matchCase": "Maiuscole/minuscole",
+    "matchCaseHint": "Corrispondenza sensibile alle maiuscole. Filtra i risultati già ottenuti, senza inviare nuove richieste.",
+    "mode": {
+      "search": "Cerca",
+      "exported": "Esportati"
+    },
+    "refresh": "Aggiorna",
+    "openJira": "Apri in Jira"
   }
 }

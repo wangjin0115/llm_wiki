@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react"
-import { BrainCircuit, ChevronDown, FileSearch, FileText, Globe2, ImagePlus, Send, Sparkles, Square, X } from "lucide-react"
+import { Bell, BrainCircuit, ChevronDown, FileSearch, FileText, Globe2, ImagePlus, Send, Sparkles, Square, X } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -18,6 +18,7 @@ import {
 export interface ChatSendOptions {
   useWebSearch: boolean
   useAnyTxtSearch: boolean
+  notifyFeishu: boolean
   agentMode: ChatAgentMode
   retrievalMode: ChatRetrievalMode
   skills: string[]
@@ -143,12 +144,14 @@ interface ChatInputProps {
   selectedContextFiles: string[]
   onUseWebSearchChange: (enabled: boolean) => void
   onUseAnyTxtSearchChange: (enabled: boolean) => void
+  onNotifyFeishuChange: (enabled: boolean) => void
   onAgentModeChange: (mode: ChatAgentMode) => void
   onRetrievalModeChange: (mode: ChatRetrievalMode) => void
   onSelectedSkillsChange: (skills: string[]) => void
   onSelectedContextFilesChange: (paths: string[]) => void
   anyTxtAvailable?: boolean
   imageInputAvailable?: boolean
+  feishuAvailable?: boolean
   placeholder?: string
 }
 
@@ -158,6 +161,7 @@ export function ChatInput({
   isStreaming,
   useWebSearch,
   useAnyTxtSearch,
+  notifyFeishu,
   agentMode,
   retrievalMode,
   availableSkills,
@@ -166,12 +170,14 @@ export function ChatInput({
   selectedContextFiles,
   onUseWebSearchChange,
   onUseAnyTxtSearchChange,
+  onNotifyFeishuChange,
   onAgentModeChange,
   onRetrievalModeChange,
   onSelectedSkillsChange,
   onSelectedContextFilesChange,
   anyTxtAvailable = true,
   imageInputAvailable = true,
+  feishuAvailable = false,
   placeholder,
 }: ChatInputProps) {
   const { t } = useTranslation()
@@ -751,6 +757,38 @@ export function ChatInput({
                 )}
               </Tooltip>
             </TooltipProvider>
+            <TooltipProvider delay={0}>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span className="inline-flex" />
+                  }
+                >
+                  <button
+                    type="button"
+                    aria-pressed={notifyFeishu}
+                    onClick={() => onNotifyFeishuChange(!notifyFeishu)}
+                    disabled={isStreaming || !feishuAvailable}
+                    className={searchToggleClass(notifyFeishu)}
+                  >
+                    <Bell className="h-3.5 w-3.5" />
+                    {t("chat.notifyFeishu", { defaultValue: "飞书通知" })}
+                    <span
+                      className={`ml-0.5 h-1.5 w-1.5 rounded-full ${
+                        notifyFeishu ? "bg-emerald-500" : "bg-muted-foreground/30"
+                      }`}
+                    />
+                  </button>
+                </TooltipTrigger>
+                {!feishuAvailable && (
+                  <TooltipContent side="top" className="max-w-64 whitespace-normal leading-relaxed">
+                    {t("chat.feishuNotConfigured", {
+                      defaultValue: "飞书通知未配置或环境不可用，请到 设置 → 飞书通知 配置",
+                    })}
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             <div className="relative">
               <button
                 type="button"
@@ -821,10 +859,10 @@ export function ChatInput({
                 onChange={(event) => onRetrievalModeChange(event.target.value as ChatRetrievalMode)}
                 disabled={isStreaming}
                 aria-label={t("chat.retrievalMode")}
-                className="h-full max-w-36 appearance-none bg-transparent py-0 pl-1.5 pr-7 text-xs font-medium outline-none disabled:pointer-events-none disabled:opacity-50"
+                className="h-full max-w-36 appearance-none bg-transparent py-0 pl-1.5 pr-7 text-xs font-medium text-foreground outline-none [color-scheme:light] disabled:pointer-events-none disabled:opacity-50 dark:[color-scheme:dark]"
               >
                 {RETRIEVAL_MODE_OPTIONS.map((retrieval) => (
-                  <option key={retrieval} value={retrieval}>
+                  <option key={retrieval} value={retrieval} className="bg-popover text-popover-foreground">
                     {t(`chat.retrievalModes.${retrieval}`)}
                   </option>
                 ))}
@@ -840,10 +878,10 @@ export function ChatInput({
                 onChange={(event) => onAgentModeChange(event.target.value as ChatAgentMode)}
                 disabled={isStreaming}
                 aria-label={t("chat.agentMode")}
-                className="h-full max-w-28 appearance-none bg-transparent py-0 pl-2 pr-7 text-xs font-medium outline-none disabled:pointer-events-none disabled:opacity-50"
+                className="h-full max-w-28 appearance-none bg-transparent py-0 pl-2 pr-7 text-xs font-medium text-foreground outline-none [color-scheme:light] disabled:pointer-events-none disabled:opacity-50 dark:[color-scheme:dark]"
               >
                 {AGENT_MODE_OPTIONS.map((mode) => (
-                  <option key={mode} value={mode}>
+                  <option key={mode} value={mode} className="bg-popover text-popover-foreground">
                     {agentModeLabel(mode)}
                   </option>
                 ))}

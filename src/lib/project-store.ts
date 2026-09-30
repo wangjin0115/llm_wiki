@@ -1,7 +1,9 @@
 import { load } from "@tauri-apps/plugin-store"
 import type { WikiProject } from "@/types/wiki"
-import type { ApiConfig, CustomLlmPreset, GeneralConfig, LlmConfig, SearchApiConfig, EmbeddingConfig, MineruConfig, MultimodalConfig, OutputLanguage, ProjectLlmOverride, ProviderConfigs, ProxyConfig, ScheduledImportConfig, SourceWatchConfig, TaskModelRoutingConfig } from "@/stores/wiki-store"
+import type { ApiConfig, CustomLlmPreset, GeneralConfig, JiraConfig, LlmConfig, SearchApiConfig, EmbeddingConfig, MineruConfig, MultimodalConfig, OutputLanguage, ProjectLlmOverride, ProviderConfigs, ProxyConfig, ScheduledImportConfig, SourceWatchConfig, TaskModelRoutingConfig } from "@/stores/wiki-store"
+import { normalizeFeishuConfig, type FeishuNotifyConfig } from "@/lib/feishu"
 import { normalizeSourceWatchConfig } from "@/lib/source-watch-config"
+import { normalizeJiraConfig } from "@/lib/jira-config"
 import { normalizePath } from "@/lib/path-utils"
 import { DEFAULT_ZOOM_LEVEL, clampZoomLevel } from "@/stores/zoom-store"
 import { DEFAULT_BACKGROUND_OPACITY, DEFAULT_BACKGROUND_BRIGHTNESS } from "@/stores/background-store"
@@ -166,6 +168,18 @@ export async function saveSearchApiConfig(config: SearchApiConfig): Promise<void
 export async function loadSearchApiConfig(): Promise<SearchApiConfig | null> {
   const store = await getStore()
   return (await store.get<SearchApiConfig>(SEARCH_API_KEY)) ?? null
+}
+
+const JIRA_CONFIG_KEY = "jiraConfig"
+
+export async function saveJiraConfig(config: JiraConfig): Promise<void> {
+  const store = await getStore()
+  await store.set(JIRA_CONFIG_KEY, config)
+}
+
+export async function loadJiraConfig(): Promise<JiraConfig> {
+  const store = await getStore()
+  return normalizeJiraConfig(await store.get<Partial<JiraConfig>>(JIRA_CONFIG_KEY))
 }
 
 const EMBEDDING_KEY = "embeddingConfig"
@@ -333,6 +347,20 @@ export async function loadGeneralConfig(): Promise<GeneralConfig> {
   return normalizeGeneralConfig(config)
 }
 
+const FEISHU_CONFIG_KEY = "feishuConfig"
+
+export async function saveFeishuConfig(config: FeishuNotifyConfig): Promise<void> {
+  const store = await getStore()
+  await store.set(FEISHU_CONFIG_KEY, normalizeFeishuConfig(config))
+  await store.save()
+}
+
+export async function loadFeishuConfig(): Promise<FeishuNotifyConfig> {
+  const store = await getStore()
+  const config = await store.get<Partial<FeishuNotifyConfig>>(FEISHU_CONFIG_KEY)
+  return normalizeFeishuConfig(config)
+}
+
 const SCHEDULED_IMPORT_KEY_PREFIX = "scheduledImportConfig:"
 
 function scheduledImportKey(projectPath: string): string {
@@ -448,6 +476,7 @@ const OUTPUT_LANGUAGE_KEY = "outputLanguage"
 const PROJECT_OUTPUT_LANGUAGE_KEY = "projectOutputLanguages"
 const PROJECT_FILE_SYNC_KEY = "projectFileSyncEnabled"
 const SOURCE_WATCH_CONFIG_KEY = "sourceWatchConfig"
+const SOURCE_WATCH_ALL_PROJECTS_KEY = "sourceWatchAllProjects"
 
 export async function saveOutputLanguage(lang: OutputLanguage, projectId?: string): Promise<void> {
   const store = await getStore()
@@ -510,6 +539,17 @@ export async function loadSourceWatchConfig(projectId?: string): Promise<SourceW
 
   const legacyEnabled = await loadProjectFileSyncEnabled(projectId)
   return normalizeSourceWatchConfig({ enabled: legacyEnabled })
+}
+
+export async function saveSourceWatchAllProjects(enabled: boolean): Promise<void> {
+  const store = await getStore()
+  await store.set(SOURCE_WATCH_ALL_PROJECTS_KEY, enabled)
+  await store.save()
+}
+
+export async function loadSourceWatchAllProjects(): Promise<boolean> {
+  const store = await getStore()
+  return (await store.get<boolean>(SOURCE_WATCH_ALL_PROJECTS_KEY)) === true
 }
 
 // ── Update-check persistence ──────────────────────────────────────────────

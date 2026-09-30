@@ -1,6 +1,9 @@
 import { create } from "zustand"
 import type { WikiProject, FileNode } from "@/types/wiki"
+import type { JiraSearchDimensions } from "@/types/jira"
 import { DEFAULT_SOURCE_WATCH_CONFIG } from "@/lib/source-watch-config"
+import { DEFAULT_FEISHU_CONFIG, type FeishuNotifyConfig } from "@/lib/feishu"
+import { DEFAULT_JIRA_CONFIG } from "@/lib/jira-config"
 import {
   buildProjectPathIndexFromTree,
   createEmptyProjectPathIndex,
@@ -185,9 +188,8 @@ interface EmbeddingConfig {
  * `concurrency` bounds parallel caption requests during ingest.
  * 30-image PDFs with sequential captioning at ~10s/image (a Qwen3
  * thinking model on consumer GPU) take 5 minutes. At concurrency=4
- * that drops to ~75s. Going wider than 8 typically just queues
- * behind a single-GPU server's batch slot, so we cap the slider
- * UI at a tasteful max in the settings view.
+ * that drops to ~75s. Higher values are available for hosted or
+ * multi-GPU endpoints that can sustain broader parallelism.
  */
 /**
  * Global outbound HTTP proxy. When `enabled` and `url` is a valid
@@ -283,6 +285,31 @@ interface SourceWatchConfig {
    *  excluded from ingest via the Sources view. */
   excludedPaths: string[]
   maxFileSizeMb: number
+}
+
+interface JiraConfig {
+  baseUrl: string
+  username: string
+  /** Stored in plain text, like every other credential this app keeps. */
+  password: string
+  /** Custom field id holding 「任务过程描述」(e.g. "customfield_10447"). Empty = not captured. */
+  processFieldId: string
+  /** Where exported md files land. Relative paths resolve against the project root. */
+  exportDir: string
+  /** Extra JQL AND-ed into every search. Empty = whole instance. */
+  scopeJql: string
+  /** Client-side only: case-sensitive substring matching. Never changes the request. */
+  matchCase: boolean
+  /** Which dimensions (title/keyword/issue key) a text query searches. */
+  searchDims: JiraSearchDimensions
+  /** Skip TLS verification for Jira requests (intranet certs outside the system trust store). */
+  acceptInvalidCerts: boolean
+  userAgent: string
+  maxAttachmentMb: number
+  sweepPageSize: number
+  maxSweepIssues: number
+  /** Run the recent-window sweep when the JQL pass returns fewer than this many issues. */
+  sweepThreshold: number
 }
 
 export type MineruModelVersion = "pipeline" | "vlm"
@@ -442,7 +469,7 @@ interface WikiState {
    * one wiki-relative) still works.
    */
   pendingScrollImageSrc: string | null
-  activeView: "chat" | "wiki" | "sources" | "search" | "graph" | "lint" | "review" | "skills" | "settings" | "history"
+  activeView: "chat" | "wiki" | "sources" | "search" | "graph" | "lint" | "review" | "jira" | "skills" | "settings" | "history"
   llmConfig: LlmConfig
   /** Persisted global/default config, kept separate while a project override is effective. */
   globalLlmConfig: LlmConfig
@@ -460,9 +487,12 @@ interface WikiState {
   proxyConfig: ProxyConfig
   scheduledImportConfig: ScheduledImportConfig
   sourceWatchConfig: SourceWatchConfig
+  jiraConfig: JiraConfig
+  sourceWatchAllProjects: boolean
   mineruConfig: MineruConfig
   apiConfig: ApiConfig
   generalConfig: GeneralConfig
+  feishuConfig: FeishuNotifyConfig
   graphUiState: GraphUiState
   dataVersion: number
 
@@ -494,9 +524,12 @@ interface WikiState {
   setProxyConfig: (config: ProxyConfig) => void
   setScheduledImportConfig: (config: ScheduledImportConfig) => void
   setSourceWatchConfig: (config: SourceWatchConfig) => void
+  setJiraConfig: (config: JiraConfig) => void
+  setSourceWatchAllProjects: (enabled: boolean) => void
   setMineruConfig: (config: MineruConfig) => void
   setApiConfig: (config: ApiConfig) => void
   setGeneralConfig: (config: GeneralConfig) => void
+  setFeishuConfig: (config: FeishuNotifyConfig) => void
   setGraphUiState: (state: GraphUiState | ((current: GraphUiState) => GraphUiState)) => void
   resetGraphUiState: () => void
   bumpDataVersion: () => void
@@ -662,6 +695,8 @@ export const useWikiStore = create<WikiState>((set) => ({
   },
 
   sourceWatchConfig: DEFAULT_SOURCE_WATCH_CONFIG,
+  jiraConfig: DEFAULT_JIRA_CONFIG,
+  sourceWatchAllProjects: false,
   mineruConfig: {
     enabled: false,
     backend: "cloud",
@@ -696,6 +731,8 @@ export const useWikiStore = create<WikiState>((set) => ({
     closeBehavior: "minimize",
   },
 
+  feishuConfig: DEFAULT_FEISHU_CONFIG,
+
   graphUiState: createDefaultGraphUiState(),
 
   setLlmConfig: (llmConfig) => set({ llmConfig }),
@@ -712,9 +749,12 @@ export const useWikiStore = create<WikiState>((set) => ({
   setProxyConfig: (proxyConfig) => set({ proxyConfig }),
   setScheduledImportConfig: (scheduledImportConfig) => set({ scheduledImportConfig }),
   setSourceWatchConfig: (sourceWatchConfig) => set({ sourceWatchConfig }),
+  setJiraConfig: (jiraConfig) => set({ jiraConfig }),
+  setSourceWatchAllProjects: (sourceWatchAllProjects) => set({ sourceWatchAllProjects }),
   setMineruConfig: (mineruConfig) => set({ mineruConfig }),
   setApiConfig: (apiConfig) => set({ apiConfig }),
   setGeneralConfig: (generalConfig) => set({ generalConfig }),
+  setFeishuConfig: (feishuConfig) => set({ feishuConfig }),
   setGraphUiState: (graphUiState) =>
     set((state) => ({
       graphUiState: typeof graphUiState === "function"
@@ -725,4 +765,4 @@ export const useWikiStore = create<WikiState>((set) => ({
   bumpDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
 }))
 
-export type { WikiState, LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage, ProxyConfig, ScheduledImportConfig, SourceWatchConfig, ApiConfig }
+export type { WikiState, LlmConfig, SearchApiConfig, EmbeddingConfig, MultimodalConfig, OutputLanguage, ProxyConfig, ScheduledImportConfig, SourceWatchConfig, JiraConfig, ApiConfig }

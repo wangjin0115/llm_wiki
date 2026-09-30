@@ -52,7 +52,8 @@
     "settingsShortcut": " (Cmd/Ctrl+,)",
     "switchProject": "切换项目",
     "updateAvailable": "有可用更新",
-    "updateAvailableSuffix": " · 有更新"
+    "updateAvailableSuffix": " · 有更新",
+    "jira": "Jira"
   },
   "updateBanner": {
     "message": "新版本 {{version}} 已发布",
@@ -276,6 +277,7 @@
       "unsupported-type": "该文件类型暂不支持摄取。",
       "sensitive-config": "配置文件不可摄取。",
       "no-llm": "尚未配置可用的 LLM，请在设置中配置模型或 API Key。",
+      "all-excluded": "该文件夹下的资料均已禁止摄取。",
       "unknown": "该文件无法摄取。"
     },
     "ingestStatus": {
@@ -303,6 +305,11 @@
     "searchPlaceholder": "按名称或路径筛选原始资料",
     "clearSearch": "清除资料筛选",
     "noSearchResults": "没有匹配“{{query}}”的原始资料",
+    "filterByIngestStatus": "按摄入状态筛选",
+    "filterAll": "所有文件",
+    "filterIngested": "已摄入",
+    "filterNotIngested": "未摄入",
+    "noIngestFilterResults": "没有符合筛选条件的资料",
     "filteredSourceCount": "显示 {{count}} / {{total}} 个资料",
     "sourceCount_plural": "{{count}} 个资料"
   },
@@ -369,6 +376,9 @@
     "typeAMessage": "输入消息...",
     "useWebSearch": "网页搜索",
     "useAnyTxtSearch": "AnyTXT 搜索",
+    "notifyFeishu": "飞书通知",
+    "feishuNotConfigured": "飞书通知未配置或环境不可用，请到 设置 → 飞书通知 配置",
+    "feishuSendFailed": "飞书通知发送失败",
     "skills": "Skills",
     "enabledSkills": "已启用 Skills",
     "skillsAutoMode": "自动",
@@ -623,11 +633,13 @@
       "scheduledImport": "定时导入",
       "mineru": "MinerU PDF",
       "apiServer": "API + MCP",
+      "feishu": "飞书通知",
       "output": "输出偏好",
       "interface": "界面",
       "maintenance": "维护",
       "changelog": "更新日志",
-      "about": "关于"
+      "about": "关于",
+      "jira": "Jira"
     },
     "sections": {
       "general": {
@@ -780,7 +792,7 @@
         "overlapChunkChars": "重叠字符数",
         "overlapChunkCharsHint": "相邻 chunk 之间的重叠字符数，避免语义在边界被切断。",
         "concurrency": "并发请求数",
-        "concurrencyHint": "同时进行的 embedding 请求上限（1–32）。请根据 endpoint 承载能力逐步调高。",
+        "concurrencyHint": "同时进行的 embedding 请求上限（1–64）。请根据 endpoint 承载能力逐步调高。",
         "batchSize": "单次请求输入数",
         "batchSizeHint": "仅 OpenAI 兼容 endpoint 支持（1–64）；不支持的 Provider 会自动使用单条请求。",
         "providerTests": "Provider 测试",
@@ -898,6 +910,8 @@
         "description": "监控 raw/sources 的外部变化，并选择哪些文件允许自动进入提取队列。",
         "enable": "监控项目资料文件夹",
         "enableDescription": "刷新原始资料列表，并为 raw/sources 下允许的新文件或修改文件建立提取任务。",
+        "allProjects": "监控所有最近项目",
+        "allProjectsDescription": "持续检查最近项目列表中所有已启用资料监控的项目。后台发现的变化会写入对应项目的队列，并在打开该项目后执行。",
         "autoIngest": "自动提取允许的原始资料文件",
         "autoIngestDescription": "关闭后，外部变化仍会刷新文件树，但不会创建提取任务。",
         "persistExtractedMarkdown": "保留解析后的 Markdown",
@@ -1176,6 +1190,35 @@
         "testing": "测试中...",
         "testSuccess": "连接成功",
         "testFailed": "测试失败"
+      },
+      "jira": {
+        "title": "Jira 集成",
+        "description": "连接 Jira Server / Data Center 实例，搜索工单并导出为项目内的 Markdown 文档。",
+        "baseUrl": "服务器地址",
+        "baseUrlHint": "实例根地址，例如 https://jira.example.com。使用 HTTP Basic 认证，仅支持 SSO 的登录方式不可用。",
+        "username": "用户名",
+        "password": "密码",
+        "showPassword": "显示密码",
+        "hidePassword": "隐藏密码",
+        "testConnection": "测试连接",
+        "testRunning": "测试中…",
+        "testOk": "已连接 {{title}}（Jira {{version}}）",
+        "passwordWarningTitle": "密码以明文保存",
+        "passwordWarning": "与应用内其他 API Key 一样，密码会被明文写入应用状态文件；能读取该文件的人即可看到密码。",
+        "acceptInvalidCerts": "跳过 TLS 证书校验",
+        "acceptInvalidCertsHint": "内网实例的证书不在系统信任库中时需要开启。开启后连接可被中间人拦截，请仅在确实因证书导致失败时使用。",
+        "userAgent": "User-Agent",
+        "userAgentHint": "部分企业网关只放行已知客户端；除非被代理拦截，否则保持默认值。",
+        "exportTitle": "导出",
+        "exportDir": "导出目录",
+        "exportDirHint": "相对路径以项目根目录为基准。当前解析为：",
+        "maxAttachmentMb": "附件下载大小上限（MB）",
+        "maxAttachmentMbHint": "超过该大小的附件仍会在文档中列出文件名，但不下载。",
+        "processFieldId": "「任务过程描述」字段 ID",
+        "processFieldIdHint": "对应文档中「任务过程描述」一节的自定义字段，可在工单的 XML/JSON 视图中找到；实例没有该字段时留空。",
+        "searchTitle": "搜索",
+        "scopeJql": "JQL 范围",
+        "scopeJqlHint": "会作为附加条件加入每次搜索。留空表示全站；填 project = AERDM 或 updated >= -365d 之类的范围，才能让「扫描最近工单」更有意义。"
       }
     }
   },
@@ -1313,6 +1356,7 @@
     "communitiesLabel": "社区",
     "showAll": "显示全部",
     "cluster": "簇 {{id}}",
+    "lowInternalConnectivity": "内部连接较少：平均每页 {{count}} 条链接",
     "surprisingConnections": "意外连接",
     "knowledgeGaps": "知识缺口",
     "deepResearch": "深度研究",
@@ -1340,5 +1384,71 @@
     "minutesAgo": "{{count}} 分钟前",
     "hoursAgo": "{{count}} 小时前",
     "daysAgo": "{{count}} 天前"
+  },
+  "jira": {
+    "search": {
+      "submit": "搜索",
+      "limit": "{{count}} 条",
+      "limitHint": "每次搜索返回的最大条数",
+      "dimTitle": "标题",
+      "dimKeyword": "关键词",
+      "dimIssueKey": "工单号",
+      "dimsHint": "勾选搜索范围：标题、全文关键词或工单号（多个工单号用逗号分隔）。改动后立即重新搜索。",
+      "searching": "搜索中…",
+      "empty": "输入关键词后搜索，或直接点击「搜索」浏览最近更新的工单。",
+      "noMatch": "没有符合当前条件的工单。",
+      "found": "{{count}} 个匹配工单",
+      "swept": "另已扫描最近更新的 {{count}} 个工单",
+      "limitReached": "已达扫描上限（{{count}}）",
+      "loadMore": "继续扫描更早的工单",
+      "unconfigured": "尚未配置 Jira。请在「设置 → Jira」中填写服务器地址、用户名和密码。"
+    },
+    "error": {
+      "title": "Jira 请求失败",
+      "config": "尚未配置 Jira",
+      "auth": "认证失败，请检查用户名和密码。",
+      "notFound": "未找到该工单。",
+      "network": "无法连接 Jira。"
+    },
+    "export": {
+      "export": "导出",
+      "exporting": "导出中…",
+      "exportingAttachments": "附件 {{completed}}/{{total}}",
+      "reExport": "重新导出",
+      "retry": "重试",
+      "done": "已导出到 {{path}}",
+      "overwriteMessage": "{{path}} 已存在，是否覆盖？",
+      "overwriteConfirm": "覆盖"
+    },
+    "exported": {
+      "loading": "加载中…",
+      "empty": "还没有导出过工单。",
+      "open": "打开",
+      "reveal": "在文件夹中显示",
+      "reExport": "重新导出",
+      "history": "该工单另有 {{count}} 份历史导出仍保留在磁盘上",
+      "openFailed": "无法打开导出的文件：{{error}}"
+    },
+    "searchPlaceholder": "按标题或标签搜索工单…",
+    "filter": {
+      "project": "项目",
+      "issuetype": "问题类型",
+      "status": "状态",
+      "assignee": "经办人",
+      "reporter": "责任人",
+      "all": "全部",
+      "searchPlaceholder": "输入以筛选，如：王",
+      "loading": "筛选选项加载中…",
+      "unassigned": "未分配",
+      "clear": "清除筛选"
+    },
+    "matchCase": "区分大小写",
+    "matchCaseHint": "区分大小写的匹配。只过滤已取得的结果，不会重新发起请求。",
+    "mode": {
+      "search": "搜索",
+      "exported": "已导出"
+    },
+    "refresh": "刷新",
+    "openJira": "打开 Jira"
   }
 }

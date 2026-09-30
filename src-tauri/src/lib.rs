@@ -598,6 +598,14 @@ pub fn run() {
             app.manage(commands::file_sync::FileSyncState::default());
             app.manage(agent::session::AgentSessionStore::default());
             app.manage(agent::cancel::AgentCancellationRegistry::default());
+            app.manage(commands::feishu_bridge::FeishuBridgeState::default());
+            // 飞书遥控对话：上次开着的话，启动 2s 后自动恢复监听。
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    commands::feishu_bridge::autostart_if_enabled(&handle).await;
+                });
+            }
             app.manage(CloseBehaviorState(Mutex::new("minimize".to_string())));
             app.manage(TrayAvailabilityState(Mutex::new(false)));
             // Start the API before optional desktop integrations so the
@@ -659,6 +667,12 @@ pub fn run() {
             commands::search::get_page_links,
             commands::external_search::web_search,
             commands::external_search::anytxt_search,
+            commands::feishu::feishu_detect,
+            commands::feishu::feishu_send_message,
+            commands::feishu::feishu_get_my_id,
+            commands::feishu_bridge::feishu_bridge_start,
+            commands::feishu_bridge::feishu_bridge_stop,
+            commands::feishu_bridge::feishu_bridge_status,
             clip_server_status,
             api_server_status,
             api_server_reload_config,
@@ -694,6 +708,7 @@ pub fn run() {
             commands::file_sync::start_project_file_watcher,
             commands::file_sync::stop_project_file_watcher,
             commands::file_sync::rescan_project_files,
+            commands::file_sync::invalidate_project_file_snapshot_paths,
             commands::file_sync::get_file_change_queue,
             commands::file_sync::retry_file_change_task,
             commands::file_sync::ignore_file_change_task,
@@ -750,6 +765,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            handle_run_event_exit(app, &event);
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen {
                 has_visible_windows,
@@ -766,6 +782,15 @@ pub fn run() {
             }
             let _ = (app, event); // suppress unused warnings on non-macOS
         });
+}
+
+/// 应用退出时收尾：停掉飞书桥接的常驻子进程，避免留孤儿 lark-cli。
+fn handle_run_event_exit(app: &tauri::AppHandle, event: &tauri::RunEvent) {
+    if let tauri::RunEvent::Exit = event {
+        use tauri::Manager;
+        let state = app.state::<commands::feishu_bridge::FeishuBridgeState>().inner().clone();
+        tauri::async_runtime::block_on(state.shutdown());
+    }
 }
 
 #[cfg(target_os = "linux")]

@@ -15,6 +15,7 @@ import { executeIngestWrites } from "@/lib/ingest"
 import { deleteFile, openPathInProject, readFile } from "@/commands/fs"
 import { getFileName, isAbsolutePath, normalizePath } from "@/lib/path-utils"
 import { hasConfiguredAnyTxt } from "@/lib/anytxt-search"
+import { buildReplySummary, sendFeishuMessage } from "@/lib/feishu"
 import type { ChatAgentEvent, ChatAgentFileChange, ChatAgentStep, ChatUserInputRequest } from "@/lib/chat-agent-types"
 import type { ChatMessage as LlmChatMessage, ContentBlock } from "@/lib/llm-client"
 import { FilePreview } from "@/components/editor/file-preview"
@@ -599,6 +600,7 @@ export function ChatPanel() {
   const maxHistoryMessages = useChatStore((s) => s.maxHistoryMessages)
   const useWebSearch = useChatStore((s) => s.useWebSearch)
   const useAnyTxtSearch = useChatStore((s) => s.useAnyTxtSearch)
+  const notifyFeishu = useChatStore((s) => s.notifyFeishu)
   const agentMode = useChatStore((s) => s.agentMode)
   const retrievalMode = useChatStore((s) => s.retrievalMode)
   const selectedSkills = useChatStore((s) => s.selectedSkills)
@@ -606,6 +608,7 @@ export function ChatPanel() {
   const disabledSkills = useChatStore((s) => s.disabledSkills)
   const setUseWebSearch = useChatStore((s) => s.setUseWebSearch)
   const setUseAnyTxtSearch = useChatStore((s) => s.setUseAnyTxtSearch)
+  const setNotifyFeishu = useChatStore((s) => s.setNotifyFeishu)
   const setAgentMode = useChatStore((s) => s.setAgentMode)
   const setRetrievalMode = useChatStore((s) => s.setRetrievalMode)
   const setSelectedSkills = useChatStore((s) => s.setSelectedSkills)
@@ -630,6 +633,10 @@ export function ChatPanel() {
   )
   const searchApiConfig = useWikiStore((s) => s.searchApiConfig)
   const anyTxtAvailable = hasConfiguredAnyTxt(searchApiConfig.anyTxt)
+  const feishuConfig = useWikiStore((s) => s.feishuConfig)
+  const feishuAvailable =
+    feishuConfig.enabled &&
+    (feishuConfig.recipientId.startsWith("ou_") || feishuConfig.recipientId.startsWith("oc_"))
   const imageInputAvailable = supportsImageInput(llmConfig)
   const availableContextFiles = useMemo(() => {
     if (!project) return []
@@ -651,6 +658,33 @@ export function ChatPanel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const [agentEvents, setAgentEvents] = useState<ChatAgentEvent[]>([])
+  const [feishuError, setFeishuError] = useState<string | null>(null)
+
+  // 铃铛开着时，每条 AI 回复完成后推送截断摘要到飞书。
+  // 失败只提示，绝不影响回复本身（不抛错、不重试）。
+  const pushFeishuSummary = useCallback(async (conversationId: string, content: string) => {
+    const { notifyFeishu: enabled, conversations } = useChatStore.getState()
+    const config = useWikiStore.getState().feishuConfig
+    if (!enabled || !config.enabled) return
+    if (!config.recipientId.startsWith("ou_") && !config.recipientId.startsWith("oc_")) return
+    const summary = buildReplySummary(content, config.summaryLength)
+    if (!summary) return
+    const title = conversations.find((c) => c.id === conversationId)?.title ?? ""
+    const header = title ? `[LLM Wiki · ${title}]` : "[LLM Wiki]"
+    try {
+      const result = await sendFeishuMessage(config.recipientId, `${header}\n${summary}`)
+      if (result.ok) {
+        setFeishuError(null)
+      } else {
+        setFeishuError(result.error || "send failed")
+        setTimeout(() => setFeishuError(null), 6000)
+      }
+    } catch (err) {
+      console.warn("[feishu] notify failed:", err)
+      setFeishuError(err instanceof Error ? err.message : String(err))
+      setTimeout(() => setFeishuError(null), 6000)
+    }
+  }, [])
   const [referencePreview, setReferencePreview] = useState<ChatReferencePreview | null>(null)
   const [contextDetailReferences, setContextDetailReferences] = useState<MessageReference[] | null>(null)
   const [generatedOutputPreviews, setGeneratedOutputPreviews] = useState<ChatReferencePreview[]>([])
@@ -1176,6 +1210,7 @@ export function ChatPanel() {
           )
           if (!pendingUserInputRequest) {
             autoOpenSingleGeneratedOutput(convId, references)
+            void pushFeishuSummary(convId, accumulated)
           }
           setAgentEvents([])
           setStreamingConversationId(null)
@@ -1207,6 +1242,7 @@ export function ChatPanel() {
             sessionId: convId,
             runId: backendRunId,
             persistSession: false,
+            allowEmptyRetrieval: true,
             mode: sendOptions.agentMode,
             retrievalMode: sendOptions.retrievalMode,
             tools: {
@@ -1258,13 +1294,24 @@ export function ChatPanel() {
           return
         }
 
-        const contextText = [
-          "You have access to the current LLM Wiki project context below. Use it as retrieved evidence when it is relevant.",
-          "",
-          backendResponseText(backendResponse),
-          "",
-          `User request: ${text}`,
-        ].join("\n")
+        const responseContext = backendResponseText(backendResponse).trim()
+        const retrievedContext = responseContext || backendReferences
+          .map((reference) => `${reference.title} (${reference.path})`)
+          .join("\n")
+        const contextText = retrievedContext
+          ? [
+              "You have access to the current LLM Wiki project context below. Use it as retrieved evidence when it is relevant.",
+              "",
+              retrievedContext,
+              "",
+              `User request: ${text}`,
+            ].join("\n")
+          : [
+              "No relevant LLM Wiki evidence was retrieved for this request.",
+              "Answer the request directly with the selected CLI provider. Clearly distinguish general knowledge from project evidence.",
+              "",
+              `User request: ${text}`,
+            ].join("\n")
         const userContent: string | ContentBlock[] = images.length > 0
           ? [
               { type: "text", text: contextText },
@@ -1278,7 +1325,7 @@ export function ChatPanel() {
         const finalMessages: LlmChatMessage[] = [
           {
             role: "system",
-            content: "Answer using the provided LLM Wiki context and references. The retrieved pages are numbered in the context as 1., 2., ... . After every factual claim, cite its source inline as [n] with the matching number (e.g. [1]). When listing a source (a source/来源 line), write each one as a clickable wiki link using the path from the reference list, e.g. [[wiki/entities/usb.md]] or [[entities/usb]]. Never invent a citation: if a claim is not supported by the provided context, say it is not covered instead. If the context is insufficient, say what is missing rather than inventing details.",
+            content: "Answer using the provided LLM Wiki context and references. If the context is insufficient, say what is missing instead of inventing details.",
           },
           ...(sendOptions.historyOverride ?? chatMessagesToLLM(priorMessages)),
           { role: "user", content: userContent },
@@ -1352,6 +1399,7 @@ export function ChatPanel() {
         finalized = true
         finalizeStreamForConversation(convId, accumulated, backendReferences, backendSteps)
         autoOpenSingleGeneratedOutput(convId, backendReferences)
+        void pushFeishuSummary(convId, accumulated)
         setAgentEvents([])
         setStreamingConversationId(null)
         abortRef.current = null
@@ -1379,7 +1427,7 @@ export function ChatPanel() {
         activeRunIdRef.current = null
       }
     },
-    [project, llmConfig, searchApiConfig, addMessageToConversation, setStreaming, appendStreamToken, finalizeStreamForConversation, createConversation, maxHistoryMessages, t, availableSkills, autoOpenSingleGeneratedOutput],
+    [project, llmConfig, searchApiConfig, addMessageToConversation, setStreaming, appendStreamToken, finalizeStreamForConversation, createConversation, maxHistoryMessages, t, availableSkills, autoOpenSingleGeneratedOutput, pushFeishuSummary],
   )
 
   const handleStop = useCallback(() => {
@@ -1621,12 +1669,18 @@ export function ChatPanel() {
           </>
         )}
 
+        {feishuError && (
+          <p className="px-4 pb-1 text-xs text-amber-600 dark:text-amber-400">
+            {t("chat.feishuSendFailed", { defaultValue: "飞书通知发送失败" })}: {feishuError}
+          </p>
+        )}
         <ChatInput
           onSend={handleSend}
           onStop={handleStop}
           isStreaming={activeStreaming}
           useWebSearch={useWebSearch}
           useAnyTxtSearch={useAnyTxtSearch}
+          notifyFeishu={notifyFeishu}
           agentMode={agentMode}
           retrievalMode={retrievalMode}
           availableSkills={availableSkills}
@@ -1635,12 +1689,14 @@ export function ChatPanel() {
           selectedContextFiles={selectedContextFiles}
           onUseWebSearchChange={setUseWebSearch}
           onUseAnyTxtSearchChange={setUseAnyTxtSearch}
+          onNotifyFeishuChange={setNotifyFeishu}
           onAgentModeChange={setAgentMode}
           onRetrievalModeChange={setRetrievalMode}
           onSelectedSkillsChange={setSelectedSkills}
           onSelectedContextFilesChange={setSelectedContextFiles}
           anyTxtAvailable={anyTxtAvailable}
           imageInputAvailable={imageInputAvailable}
+          feishuAvailable={feishuAvailable}
           placeholder={
             mode === "ingest"
               ? t("chat.ingestPlaceholder")

@@ -82,6 +82,23 @@ fn parse_version(s: &str) -> Vec<u64> {
         .collect()
 }
 
+/// 抑制 lark-cli 子进程在 Windows 下弹出控制台窗口。
+///
+/// release 构建下本应用是 windows 子系统（无控制台），spawn 控制台程序会让
+/// Windows 新建 conhost 窗口（标题即 lark-cli.exe 路径）；dev 构建父进程自带
+/// 控制台、子进程继承，所以只在打包安装后才看到弹窗。统一加 CREATE_NO_WINDOW 屏蔽。
+pub(crate) fn suppress_windows_console(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = cmd;
+    }
+}
+
 /// 剔除 LARKSUITE_CLI_* 注入变量的 Command（其余继承父进程，USERPROFILE 随之保留）。
 pub(crate) fn strip_lark_env(mut cmd: Command) -> Command {
     for (key, _) in std::env::vars() {
@@ -89,6 +106,7 @@ pub(crate) fn strip_lark_env(mut cmd: Command) -> Command {
             cmd.env_remove(&key);
         }
     }
+    suppress_windows_console(&mut cmd);
     cmd
 }
 
@@ -499,6 +517,7 @@ pub async fn feishu_test_doc_target(doc_token: String) -> Result<FeishuDocTarget
     // 与发布相同的两级身份策略：先继承环境变量，失败再剥离重试
     let run = {
         let mut cmd = Command::new(&cli);
+        suppress_windows_console(&mut cmd);
         cmd = add_args(cmd);
         match run_with_timeout(&mut cmd, Duration::from_secs(20)).await {
             Ok(out) => LarkRun::from_output(out),
@@ -706,6 +725,7 @@ async fn set_doc_title(cli: &PathBuf, doc_url: &str, title: &str) {
     let title_arg = title.trim().to_string();
     let mut run = {
         let mut cmd = Command::new(cli);
+        suppress_windows_console(&mut cmd);
         cmd.arg("drive")
             .arg("+update-title")
             .arg("--json")
@@ -753,6 +773,7 @@ async fn set_doc_link_editable(cli: &PathBuf, doc_url: &str) {
     }
     let first = {
         let mut cmd = Command::new(cli);
+        suppress_windows_console(&mut cmd);
         perm_patch_args(&mut cmd, token);
         run_with_timeout(&mut cmd, Duration::from_secs(20)).await
     };
@@ -876,6 +897,7 @@ pub(crate) async fn publish_feishu_doc(
     //    scope 错误，此时返回 Err 由调用方降级为文本回复。
     let mut run = {
         let mut cmd = Command::new(&cli);
+        suppress_windows_console(&mut cmd);
         cmd = add_args(cmd);
         match run_with_timeout(&mut cmd, Duration::from_secs(60)).await {
             Ok(out) => LarkRun::from_output(out),

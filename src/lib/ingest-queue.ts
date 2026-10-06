@@ -637,7 +637,6 @@ export async function removeTasks(taskIds: readonly string[]): Promise<number> {
   const targetIds = new Set(targets.map((task) => task.id))
   const hadProcessingTask = targets.some((task) => task.status === "processing")
   for (const task of targets) {
-    restoredPausedTaskIds.delete(task.id)
     if (task.status === "processing") cancelledInFlightTaskIds.add(task.id)
   }
   for (const task of targets) {

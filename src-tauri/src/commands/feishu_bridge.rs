@@ -12,16 +12,16 @@
 
 use std::collections::HashSet;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, Mutex};
 
-use super::feishu::{find_lark_cli, send_feishu_text, strip_lark_env};
+use super::feishu::{find_lark_cli, send_feishu_text, strip_lark_env, suppress_windows_console};
 
 /// 回发飞书的单条文本上限（字符）。飞书文本消息体量大易被截断，保守取 3500。
 const MAX_REPLY_CHARS: usize = 3500;
@@ -55,6 +55,14 @@ pub struct BridgeStatus {
     pub last_message: String,
     /// 回复时使用的项目（默认 "current"）。
     pub project_id: String,
+    /// 是否有消息正在处理（true 时前端可显示进度）。
+    pub busy: bool,
+    /// 正在处理的消息摘要（busy 时有意义）。
+    pub current_message: String,
+    /// 当前任务已耗时（秒），busy 时由前端每秒自增展示。
+    pub current_elapsed_secs: u64,
+    /// 排队等待处理的消息条数。
+    pub pending: usize,
 }
 
 /// 桥接共享状态。全部字段是 Arc，可自由 clone 进各 task。
@@ -64,12 +72,32 @@ pub struct FeishuBridgeState {
     status: Arc<Mutex<BridgeStatus>>,
     child: Arc<Mutex<Option<Child>>>,
     stdin: Arc<Mutex<Option<ChildStdin>>>,
+    /// 最近一次子进程退出是否由网络/DNS 故障引起（stderr 命中关键行时置位）。
+    /// 用于把 `consume exited unexpectedly` 细化为可操作的提示。
+    net_error: Arc<AtomicBool>,
+    /// 是否有消息正在处理（供前端显示「正在处理 XX」）。
+    busy: Arc<AtomicBool>,
+    /// 正在处理的消息摘要。
+    current_message: Arc<Mutex<String>>,
+    /// 当前任务的开始时刻，用于算 elapsed。
+    started_at: Arc<Mutex<Option<Instant>>>,
+    /// 排队等待处理的消息条数（pump_stdout 入队 +1，worker 开始处理 -1）。
+    pending: Arc<AtomicUsize>,
 }
 
 impl FeishuBridgeState {
     pub async fn snapshot(&self) -> BridgeStatus {
         let mut status = self.status.lock().await.clone();
         status.running = self.running.load(Ordering::SeqCst);
+        status.busy = self.busy.load(Ordering::SeqCst);
+        status.current_message = self.current_message.lock().await.clone();
+        status.pending = self.pending.load(Ordering::SeqCst);
+        status.current_elapsed_secs = self
+            .started_at
+            .lock()
+            .await
+            .map(|start| start.elapsed().as_secs())
+            .unwrap_or(0);
         status
     }
 
@@ -92,12 +120,12 @@ async fn stop_inner(state: &FeishuBridgeState) {
         let pid = child.id();
         #[cfg(target_os = "windows")]
         if let Some(pid) = pid.filter(|p| *p > 0) {
-            let _ = tokio::process::Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
+            let mut tk = tokio::process::Command::new("taskkill");
+            tk.args(["/PID", &pid.to_string(), "/T", "/F"])
                 .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .await;
+                .stderr(Stdio::null());
+            suppress_windows_console(&mut tk);
+            let _ = tk.status().await;
         }
         // 兜底 + 回收，避免僵尸句柄。
         let _ = child.start_kill();
@@ -105,6 +133,12 @@ async fn stop_inner(state: &FeishuBridgeState) {
     }
     let mut status = state.status.lock().await;
     status.ready = false;
+    drop(status);
+    // 复位进度：停止后 UI 不应残留「正在处理」。
+    state.busy.store(false, Ordering::SeqCst);
+    state.current_message.lock().await.clear();
+    *state.started_at.lock().await = None;
+    state.pending.store(0, Ordering::SeqCst);
 }
 
 /// 从 consume 输出的一行 NDJSON 解析入站消息；非文本/无用行返回 None。
@@ -156,13 +190,20 @@ fn parse_inbound(line: &str) -> Option<FeishuInbound> {
 }
 
 /// 读取 consume 的 stdout，逐行解析后投递到 worker。
-async fn pump_stdout(stdout: ChildStdout, tx: mpsc::Sender<FeishuInbound>) {
+async fn pump_stdout(
+    stdout: ChildStdout,
+    tx: mpsc::Sender<FeishuInbound>,
+    pending: Arc<AtomicUsize>,
+) {
     let mut lines = BufReader::new(stdout).lines();
     loop {
         match lines.next_line().await {
             Ok(Some(line)) => {
                 if let Some(msg) = parse_inbound(&line) {
+                    // 入队计数：worker 取走时 -1，反映当前排队深度。
+                    pending.fetch_add(1, Ordering::SeqCst);
                     if tx.send(msg).await.is_err() {
+                        pending.fetch_sub(1, Ordering::SeqCst);
                         break;
                     }
                 }
@@ -171,6 +212,24 @@ async fn pump_stdout(stdout: ChildStdout, tx: mpsc::Sender<FeishuInbound>) {
             Err(_) => break,
         }
     }
+}
+
+/// 判断一行 stderr 是否指示网络/DNS 故障（用于细化重连提示）。
+fn is_network_error(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    [
+        "no such host",
+        "lookup ",
+        "connection attempt failed",
+        "establish connection failed",
+        "connection refused",
+        "timed out",
+        "timeout",
+        "network is unreachable",
+        "get conn url failed",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
 }
 
 /// 读取 stderr：检测 ready 标记与退出原因，写入状态供前端展示。
@@ -185,6 +244,10 @@ async fn pump_stderr(
         }
         if line.contains("[event] exited") {
             state.status.lock().await.ready = false;
+        }
+        // 网络/DNS 故障标记：退出后据此给出可操作提示（而非笼统的 exited）。
+        if is_network_error(&line) {
+            state.net_error.store(true, Ordering::SeqCst);
         }
         // lark-cli 的告警/错误行保留到 last_error，便于排查断链。
         if line.contains("error") || line.contains("WARN") || line.contains("denied") {
@@ -215,6 +278,9 @@ async fn consume_supervisor(state: FeishuBridgeState, tx: mpsc::Sender<FeishuInb
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
+        // 新连接开始前清掉上一轮的网络故障标记。
+        state.net_error.store(false, Ordering::SeqCst);
+
         let mut child = match cmd.spawn() {
             Ok(child) => child,
             Err(err) => {
@@ -232,7 +298,7 @@ async fn consume_supervisor(state: FeishuBridgeState, tx: mpsc::Sender<FeishuInb
         *state.child.lock().await = Some(child);
 
         if let Some(stdout) = stdout {
-            pump_stdout(stdout, tx.clone()).await;
+            pump_stdout(stdout, tx.clone(), state.pending.clone()).await;
         }
 
         // 子进程已退出：清理句柄，判断是否需要重连。
@@ -245,8 +311,13 @@ async fn consume_supervisor(state: FeishuBridgeState, tx: mpsc::Sender<FeishuInb
         if !state.running.load(Ordering::SeqCst) {
             break;
         }
-        state.status.lock().await.last_error =
-            "consume exited unexpectedly, reconnecting…".to_string();
+        // 区分退出原因：网络/DNS 故障给出可操作提示，其余才是真正的异常退出。
+        let msg = if state.net_error.load(Ordering::SeqCst) {
+            "网络不可达（DNS 解析失败或连接超时），5 秒后重试…"
+        } else {
+            "consume exited unexpectedly, reconnecting…"
+        };
+        state.status.lock().await.last_error = msg.to_string();
         tokio::time::sleep(RECONNECT_DELAY).await;
     }
 }
@@ -257,8 +328,11 @@ fn truncate_reply(text: &str) -> String {
     if trimmed.chars().count() <= MAX_REPLY_CHARS {
         return trimmed.to_string();
     }
-    let head: String = trimmed.chars().take(MAX_REPLY_CHARS).collect();
-    format!("{head}\n…（内容过长已截断）")
+    // 后缀本身也要占预算，否则截断后反而比原文更长。
+    const SUFFIX: &str = "\n…（内容过长已截断）";
+    let budget = MAX_REPLY_CHARS.saturating_sub(SUFFIX.chars().count());
+    let head: String = trimmed.chars().take(budget).collect();
+    format!("{head}{SUFFIX}")
 }
 
 /// 串行处理入站消息：去重 → 调 Agent（复用 agent_start_turn）→ 回发。
@@ -270,6 +344,8 @@ async fn worker(
 ) {
     let mut seen: HashSet<String> = HashSet::new();
     while let Some(msg) = rx.recv().await {
+        // 消息已被 worker 取走，队列深度 -1（去重跳过的分支也已离队）。
+        state.pending.fetch_sub(1, Ordering::SeqCst);
         if !state.running.load(Ordering::SeqCst) {
             break;
         }
@@ -286,6 +362,11 @@ async fn worker(
         state.status.lock().await.last_message =
             format!("{}: {}", msg.sender_id, truncate_reply(&msg.content));
         state.status.lock().await.last_error = String::new();
+
+        // 进入处理：置 busy + 记开始时刻，供前端显示「正在处理 XX（已 Ns）」。
+        state.busy.store(true, Ordering::SeqCst);
+        *state.current_message.lock().await = truncate_reply(&msg.content);
+        *state.started_at.lock().await = Some(Instant::now());
 
         // 每条消息实时读取文档回复配置（保存设置即生效，无需重启桥接）。
         let feishu_cfg = crate::api_server::load_app_state(&app)
@@ -375,6 +456,10 @@ async fn worker(
         } else {
             state.status.lock().await.last_error = sent.error;
         }
+        // 本轮结束：清 busy，前端进度行消失。
+        state.busy.store(false, Ordering::SeqCst);
+        state.current_message.lock().await.clear();
+        *state.started_at.lock().await = None;
     }
 }
 
@@ -523,5 +608,19 @@ mod tests {
         let out = truncate_reply(&long);
         assert!(out.ends_with("（内容过长已截断）"));
         assert!(out.chars().count() < long.chars().count());
+    }
+
+    #[test]
+    fn detects_network_errors() {
+        // 真实踩到的 DNS 失败行
+        assert!(is_network_error(
+            "2026/09/30 [SDK WARN] get conn url failed, err: Post \"https://open.feishu.cn/callback/ws/endpoint\": dial tcp: lookup open.feishu.cn: no such host"
+        ));
+        assert!(is_network_error(
+            "[SDK ERROR] receive message failed: wsarecv: A connection attempt failed because the connected party did not properly respond after a period of time"
+        ));
+        // 非网络类输出不应误判
+        assert!(!is_network_error("[event] ready event_key=im.message.receive_v1"));
+        assert!(!is_network_error("[event] exited"));
     }
 }

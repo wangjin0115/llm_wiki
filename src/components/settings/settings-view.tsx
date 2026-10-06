@@ -405,7 +405,6 @@ export function SettingsView() {
       saveGeneralConfig,
       loadGeneralConfig,
       saveFeishuConfig,
-      loadFeishuConfig,
       saveZoomLevel,
       loadZoomLevel,
       saveBackgroundImage,

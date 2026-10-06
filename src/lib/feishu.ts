@@ -194,6 +194,14 @@ export interface FeishuBridgeStatus {
   lastMessage: string
   /** 回复时使用的项目 ID。 */
   projectId: string
+  /** 是否有消息正在处理。 */
+  busy: boolean
+  /** 正在处理的消息摘要（busy 时有意义）。 */
+  currentMessage: string
+  /** 当前任务已耗时（秒）。 */
+  currentElapsedSecs: number
+  /** 排队等待处理的消息条数。 */
+  pending: number
 }
 
 /** 启动飞书遥控对话桥接；projectId 省略时用当前项目。 */

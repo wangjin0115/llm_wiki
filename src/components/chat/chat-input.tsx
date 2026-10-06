@@ -136,6 +136,7 @@ interface ChatInputProps {
   isStreaming: boolean
   useWebSearch: boolean
   useAnyTxtSearch: boolean
+  notifyFeishu: boolean
   agentMode: ChatAgentMode
   retrievalMode: ChatRetrievalMode
   availableSkills: ChatSkillOption[]
@@ -380,6 +381,7 @@ export function ChatInput({
     onSend(trimmed, images, {
       useWebSearch,
       useAnyTxtSearch,
+      notifyFeishu,
       agentMode,
       retrievalMode,
       skills: selectedSkills,
@@ -393,7 +395,7 @@ export function ChatInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [agentMode, imageInputAvailable, images, isStreaming, onSend, retrievalMode, selectedContextFiles, selectedSkills, t, useAnyTxtSearch, useWebSearch, value])
+  }, [agentMode, imageInputAvailable, images, isStreaming, notifyFeishu, onSend, retrievalMode, selectedContextFiles, selectedSkills, t, useAnyTxtSearch, useWebSearch, value])
 
   const applySlashSkill = useCallback(
     (skill: ChatSkillOption) => {

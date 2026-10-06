@@ -912,9 +912,10 @@ export function ChatPanel() {
       images: MessageImage[] = [],
       options?: InternalChatSendOptions,
     ) => {
-      const sendOptions = options ?? {
+      const sendOptions: InternalChatSendOptions = options ?? {
         useWebSearch: useChatStore.getState().useWebSearch,
         useAnyTxtSearch: useChatStore.getState().useAnyTxtSearch,
+        notifyFeishu: useChatStore.getState().notifyFeishu,
         agentMode: useChatStore.getState().agentMode,
         retrievalMode: useChatStore.getState().retrievalMode,
         skills: useChatStore.getState().selectedSkills,
@@ -1566,6 +1567,7 @@ export function ChatPanel() {
       await handleSend(resumeMessage, priorUser.images ?? [], {
         useWebSearch: useChatStore.getState().useWebSearch,
         useAnyTxtSearch: useChatStore.getState().useAnyTxtSearch,
+        notifyFeishu: useChatStore.getState().notifyFeishu,
         agentMode: useChatStore.getState().agentMode,
         retrievalMode: useChatStore.getState().retrievalMode,
         skills: useChatStore.getState().selectedSkills,
@@ -1598,6 +1600,7 @@ export function ChatPanel() {
     handleSend(resumeMessage, [], {
       useWebSearch: useChatStore.getState().useWebSearch,
       useAnyTxtSearch: useChatStore.getState().useAnyTxtSearch,
+      notifyFeishu: useChatStore.getState().notifyFeishu,
       agentMode: useChatStore.getState().agentMode,
       retrievalMode: useChatStore.getState().retrievalMode,
       skills: useChatStore.getState().selectedSkills,

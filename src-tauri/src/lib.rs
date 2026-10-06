@@ -333,14 +333,48 @@ fn resolve_agent_project(
 ) -> Result<AgentProjectEntry, String> {
     let decoded = percent_decode(project_id);
     let wants_current = decoded.eq_ignore_ascii_case("current");
-    load_agent_projects(app)
-        .into_iter()
-        .find(|project| {
-            project.id == decoded
-                || project_path_matches(&project.path, &decoded)
-                || (wants_current && project.current)
-        })
-        .ok_or_else(|| format!("Unknown project: {decoded}"))
+    if let Some(project) = load_agent_projects(app).into_iter().find(|project| {
+        project.id == decoded
+            || project_path_matches(&project.path, &decoded)
+            || (wants_current && project.current)
+    }) {
+        return Ok(project);
+    }
+    // 兜底：`CURRENT_PROJECT` 是内存态，由前端 openProject 完成后 POST /project
+    // 才写入。冷启动或前端尚未加载完项目时它为空，"current" 会解析失败
+    // （表现为飞书桥接首条消息回 "Unknown project: current"）。此时回退到
+    // app-state 里持久化的 lastProject。
+    if wants_current {
+        if let Some(fallback) = load_last_agent_project(app) {
+            return Ok(fallback);
+        }
+    }
+    Err(format!("Unknown project: {decoded}"))
+}
+
+/// 读取 app-state.json 的 `lastProject`，作为 `current` 的兜底项目。
+fn load_last_agent_project(app: &tauri::AppHandle) -> Option<AgentProjectEntry> {
+    let parsed = load_agent_app_state(app)?;
+    let last = parsed.get("lastProject")?;
+    let path = normalize_path(last.get("path").and_then(Value::as_str)?);
+    if path.is_empty() {
+        return None;
+    }
+    let id = last
+        .get("id")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| read_project_id(&path).unwrap_or_else(|| path.clone()));
+    Some(AgentProjectEntry {
+        id,
+        name: last
+            .get("name")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| project_name_from_path(&path)),
+        current: true,
+        path,
+    })
 }
 
 fn load_agent_projects(app: &tauri::AppHandle) -> Vec<AgentProjectEntry> {

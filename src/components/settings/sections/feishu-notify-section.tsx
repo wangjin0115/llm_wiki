@@ -34,6 +34,8 @@ export function FeishuNotifySection({ draft, setDraft }: Props) {
   const [myIdState, setMyIdState] = useState<"idle" | "loading" | "ok" | "fail">("idle")
   const [myIdError, setMyIdError] = useState("")
   const [bridgeStatus, setBridgeStatus] = useState<FeishuBridgeStatus | null>(null)
+  // 本地秒表：Rust 侧状态 5s 才刷新一次，这里每秒自增，让「已 Ns」连续跳动。
+  const [elapsedTick, setElapsedTick] = useState(0)
   const [folderTestState, setFolderTestState] = useState<"idle" | "testing" | "ok" | "fail">("idle")
   const [folderTestInfo, setFolderTestInfo] = useState("")
   const [docTestState, setDocTestState] = useState<"idle" | "testing" | "ok" | "fail">("idle")
@@ -128,7 +130,11 @@ export function FeishuNotifySection({ draft, setDraft }: Props) {
     const poll = async () => {
       try {
         const status = await getFeishuBridgeStatus()
-        if (!cancelled) setBridgeStatus(status)
+        if (!cancelled) {
+          setBridgeStatus(status)
+          // 新一轮轮询落地，本地秒表归零，重新累加。
+          setElapsedTick(0)
+        }
       } catch {
         // 桥接未启动时忽略
       }
@@ -140,6 +146,14 @@ export function FeishuNotifySection({ draft, setDraft }: Props) {
       clearInterval(timer)
     }
   }, [draft.feishuConfig.bridgeEnabled])
+
+  // 忙时每秒重渲染，配合后端的起始时刻把 elapsed 补足到秒级。
+  useEffect(() => {
+    if (!bridgeStatus?.busy) return
+    setElapsedTick((n) => n + 1)
+    const timer = setInterval(() => setElapsedTick((n) => n + 1), 1000)
+    return () => clearInterval(timer)
+  }, [bridgeStatus?.busy])
 
   const runDetect = useCallback(async () => {
     setDetecting(true)
@@ -590,6 +604,23 @@ export function FeishuNotifySection({ draft, setDraft }: Props) {
                     project: bridgeStatus.projectId,
                   })}
                 </p>
+                {bridgeStatus.busy && (
+                  <p className="break-all text-sky-600 dark:text-sky-400">
+                    {t("settings.sections.feishu.bridgeBusy", {
+                      defaultValue: "⟳ 正在处理：{{msg}}（已 {{secs}}s）",
+                      msg: bridgeStatus.currentMessage || "…",
+                      secs: bridgeStatus.currentElapsedSecs + elapsedTick,
+                    })}
+                  </p>
+                )}
+                {bridgeStatus.pending > 0 && (
+                  <p className="text-muted-foreground">
+                    {t("settings.sections.feishu.bridgePending", {
+                      defaultValue: "排队等待 {{count}} 条",
+                      count: bridgeStatus.pending,
+                    })}
+                  </p>
+                )}
                 {bridgeStatus.lastMessage && (
                   <p className="break-all text-muted-foreground">
                     {t("settings.sections.feishu.bridgeLast", { defaultValue: "最近收到：" })}

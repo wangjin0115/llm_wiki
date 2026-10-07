@@ -107,6 +107,10 @@ export interface SettingsDraft {
   // Feishu notify — push a truncated summary to Feishu after each AI reply
   feishuConfig: FeishuNotifyConfig
 
+  // IME dictionary export — write wiki terms as a pinyin TSV into the
+  // Qingjian user dictionary folder
+  wikiDictEnabled: boolean
+
   // Local HTTP API server
   apiEnabled: boolean
   apiAllowUnauthenticated: boolean

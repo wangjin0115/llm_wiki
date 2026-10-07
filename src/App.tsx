@@ -10,6 +10,7 @@ import { useChatStore } from "@/stores/chat-store"
 import { BASE_FONT_SIZE_PX, useZoomStore } from "@/stores/zoom-store"
 import { openProject } from "@/commands/fs"
 import { getLastProject, getRecentProjects, saveLastProject, loadLlmConfig, loadLanguage, loadSearchApiConfig, loadEmbeddingConfig, loadMineruConfig, loadMultimodalConfig, loadOutputLanguage, loadProviderConfigs, loadCustomLlmPresets, loadActivePresetId, loadTaskModelRouting, loadProjectLlmOverride, loadProxyConfig, loadScheduledImportConfig, saveScheduledImportConfig, loadSourceWatchAllProjects, loadSourceWatchConfig, loadApiConfig, loadGeneralConfig, loadZoomLevel, loadBackgroundImage, loadBackgroundOpacity, loadBackgroundBrightness, loadFeishuConfig, loadJiraConfig } from "@/lib/project-store"
+import { loadWikiDictConfig } from "@/lib/wiki-dict-export"
 import { loadReviewItems, loadLintItems, loadChatHistory, loadChatPreferences } from "@/lib/persist"
 import { useBackgroundStore } from "@/stores/background-store"
 import { BackgroundLayer } from "@/components/layout/background-layer"
@@ -433,6 +434,8 @@ function App() {
         // bell toggle knows whether notifications are configured.
         const savedFeishu = await loadFeishuConfig()
         useWikiStore.getState().setFeishuConfig(savedFeishu)
+        const savedWikiDict = await loadWikiDictConfig()
+        useWikiStore.getState().setWikiDictConfig(savedWikiDict)
         try {
           await invoke<string>("set_close_behavior", { value: savedGeneral.closeBehavior })
         } catch (err) {
@@ -587,6 +590,17 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: proj.path }),
       }).catch(() => {})
+
+      if (useWikiStore.getState().wikiDictConfig.enabled) {
+        import("@/lib/wiki-dict-export")
+          .then(({ exportWikiDict }) => exportWikiDict(proj.path))
+          .then((result) =>
+            console.log(
+              `[wiki-dict] exported ${result.entries} terms to ${result.targetPath}`,
+            ),
+          )
+          .catch((err) => console.warn("[wiki-dict] startup export failed:", err))
+      }
 
       // Send all recent projects to clip server for extension project picker
       getRecentProjects().then((recents) => {

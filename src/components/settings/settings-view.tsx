@@ -17,6 +17,7 @@ import {
   Settings,
   FileText,
   Ticket,
+  Keyboard,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { invoke } from "@tauri-apps/api/core"
@@ -50,6 +51,7 @@ import { InterfaceSection } from "./sections/interface-section"
 import { NetworkSection } from "./sections/network-section"
 import { ScheduledImportSection } from "./sections/scheduled-import-section"
 import { FeishuNotifySection } from "./sections/feishu-notify-section"
+import { ImeExportSection } from "./sections/ime-export-section"
 import { SourceWatchSection } from "./sections/source-watch-section"
 import { JiraSection } from "./sections/jira-section"
 import { MineruSection } from "./sections/mineru-section"
@@ -72,6 +74,7 @@ type CategoryId =
   | "mineru"
   | "api-server"
   | "feishu"
+  | "ime-export"
   | "output"
   | "interface"
   | "maintenance"
@@ -100,6 +103,7 @@ const CATEGORIES: Category[] = [
   { id: "mineru", labelKey: "settings.categories.mineru", icon: FileText },
   { id: "api-server", labelKey: "settings.categories.apiServer", icon: Server },
   { id: "feishu", labelKey: "settings.categories.feishu", icon: Bell },
+  { id: "ime-export", labelKey: "settings.categories.imeExport", icon: Keyboard },
   { id: "output", labelKey: "settings.categories.output", icon: Languages },
   { id: "interface", labelKey: "settings.categories.interface", icon: Palette },
   { id: "maintenance", labelKey: "settings.categories.maintenance", icon: Wrench },
@@ -120,6 +124,7 @@ function initialDraft(
   apiConfig: ReturnType<typeof useWikiStore.getState>["apiConfig"],
   generalConfig: ReturnType<typeof useWikiStore.getState>["generalConfig"],
   feishuConfig: ReturnType<typeof useWikiStore.getState>["feishuConfig"],
+  wikiDictConfig: ReturnType<typeof useWikiStore.getState>["wikiDictConfig"],
   maxHistoryMessages: number,
   uiLanguage: string,
   projectPath?: string,
@@ -210,6 +215,7 @@ function initialDraft(
     autostart: generalConfig.autostart,
     closeBehavior: generalConfig.closeBehavior,
     feishuConfig: { ...feishuConfig },
+    wikiDictEnabled: wikiDictConfig.enabled,
     uiLanguage,
     theme: theme ?? "system",
     zoomLevel: zoomLevel ?? useZoomStore.getState().level,
@@ -245,6 +251,7 @@ export function SettingsView() {
   const generalConfig = useWikiStore((s) => s.generalConfig)
   const setGeneralConfig = useWikiStore((s) => s.setGeneralConfig)
   const feishuConfig = useWikiStore((s) => s.feishuConfig)
+  const wikiDictConfig = useWikiStore((s) => s.wikiDictConfig)
   const setFeishuConfig = useWikiStore((s) => s.setFeishuConfig)
   const maxHistoryMessages = useChatStore((s) => s.maxHistoryMessages)
   const setMaxHistoryMessages = useChatStore((s) => s.setMaxHistoryMessages)
@@ -276,6 +283,7 @@ export function SettingsView() {
       apiConfig,
       generalConfig,
       feishuConfig,
+      wikiDictConfig,
       maxHistoryMessages,
       i18n.language,
       project?.path,
@@ -345,6 +353,7 @@ export function SettingsView() {
         apiConfig,
         generalConfig,
         feishuConfig,
+        wikiDictConfig,
         maxHistoryMessages,
         prev.uiLanguage,
         project?.path,
@@ -368,6 +377,7 @@ export function SettingsView() {
     apiConfig,
     generalConfig,
     feishuConfig,
+    wikiDictConfig,
     maxHistoryMessages,
     project,
   ])
@@ -494,6 +504,9 @@ export function SettingsView() {
       closeBehavior: draft.closeBehavior,
     }
     const newFeishuConfig = normalizeFeishuConfig(draft.feishuConfig)
+    const newWikiDictConfig = {
+      enabled: draft.wikiDictEnabled,
+    }
 
     // Push all config values to zustand before any awaited save below. The
     // settings draft resync effect runs after store updates; if any config stays
@@ -513,6 +526,7 @@ export function SettingsView() {
     setApiConfig(newApiConfig)
     setGeneralConfig(newGeneralConfig)
     setFeishuConfig(newFeishuConfig)
+    useWikiStore.getState().setWikiDictConfig(newWikiDictConfig)
 
     try {
       await saveLlmConfig(newLlm)
@@ -575,6 +589,13 @@ export function SettingsView() {
 
       await saveGeneralConfig(newGeneralConfig)
       await saveFeishuConfig(newFeishuConfig)
+      const { saveWikiDictConfig, exportWikiDict } = await import("@/lib/wiki-dict-export")
+      await saveWikiDictConfig(newWikiDictConfig)
+      if (project && newWikiDictConfig.enabled) {
+        exportWikiDict(project.path).catch((err) =>
+          console.warn("[ime-export] post-save export failed:", err),
+        )
+      }
       // 飞书遥控对话桥接：跟随开关启停（幂等，重复保存不会起两个实例）。
       try {
         const { startFeishuBridge, stopFeishuBridge } = await import("@/lib/feishu")
@@ -650,6 +671,7 @@ export function SettingsView() {
           persistedApi,
           persistedGeneral,
           persistedZoom,
+          persistedWikiDictResult,
         ] = await Promise.allSettled([
           loadLlmConfig(),
           loadEmbeddingConfig(),
@@ -663,6 +685,7 @@ export function SettingsView() {
           loadApiConfig(),
           loadGeneralConfig(),
           loadZoomLevel(),
+          import("@/lib/wiki-dict-export").then((m) => m.loadWikiDictConfig()),
         ] as const)
         setLlmConfig(resultValue(persistedLlm, null) ?? llmConfig)
         setEmbeddingConfig(resultValue(persistedEmbedding, null) ?? embeddingConfig)
@@ -678,6 +701,10 @@ export function SettingsView() {
         setMineruConfig(resultValue(persistedMineru, null) ?? mineruConfig)
         setApiConfig(resultValue(persistedApi, null) ?? apiConfig)
         setGeneralConfig(resultValue(persistedGeneral, generalConfig))
+        const persistedWikiDict = resultValue(persistedWikiDictResult, null)
+        if (persistedWikiDict) {
+          useWikiStore.getState().setWikiDictConfig(persistedWikiDict)
+        }
         useZoomStore.getState().setLevel(resultValue(persistedZoom, useZoomStore.getState().level))
       } catch (reloadErr) {
         console.warn("[settings] failed to reload persisted settings after save failure:", reloadErr)
@@ -744,6 +771,8 @@ export function SettingsView() {
         return <ApiServerSection draft={draft} setDraft={setDraft} />
       case "feishu":
         return <FeishuNotifySection draft={draft} setDraft={setDraft} />
+      case "ime-export":
+        return <ImeExportSection draft={draft} setDraft={setDraft} />
       case "output":
         return <OutputSection draft={draft} setDraft={setDraft} />
       case "interface":
